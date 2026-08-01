@@ -2,12 +2,12 @@
 # Replace OWNER after remotes exist.
 
 actions:
-  repository: OWNER/gh-platform-actions
-  # 40-char commit SHA of tofu-pipeline release.
-  ref: REPLACE_WITH_ACTIONS_COMMIT_SHA
+  repository: ravichandrapatel/gh-platform-actions
+  # Pin to tofu-pipeline branch tip (validation-only; replace with release SHA when ready).
+  ref: 7ad28f6e7a7375f1ba6e78d6d9cd40f4eb0eba22
 
 modules:
-  repository: OWNER/gh-platform-modules
+  repository: ravichandrapatel/gh-platform-modules
   # Default tagging module pin used by generated stacks (product catalog overrides path modules).
   tagging_ref: tagging/v0.0.0
 

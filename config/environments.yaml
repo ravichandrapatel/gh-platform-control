@@ -2,18 +2,18 @@
 # MVP: only dev and prod (one AWS account each).
 
 environments:
-  # Starter: examples/infra-dev/ → OWNER/infra-dev
+  # Starter: examples/infra-dev/ → publish as infra-dev
   dev:
-    workload_repository: OWNER/infra-dev
+    workload_repository: ravichandrapatel/infra-dev
     github_environment: dev
     aws_account_id: "REPLACE_ACCOUNT_ID"
     aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-dev
     aws_region: us-east-1
     tagging_environment: NON-PROD
 
-  # Starter: examples/infra-prod/ → OWNER/infra-prod
+  # Starter: examples/infra-prod/ → publish as infra-prod (not created yet)
   prod:
-    workload_repository: OWNER/infra-prod
+    workload_repository: ravichandrapatel/infra-prod
     github_environment: prod
     aws_account_id: "REPLACE_ACCOUNT_ID"
     aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
