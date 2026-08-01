@@ -55,6 +55,7 @@ jobs:
             --out /tmp/resolved.json
           echo "stack_id=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["stack_id"])')" >> "${GITHUB_OUTPUT}"
           echo "workload=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["workload_repository"])')" >> "${GITHUB_OUTPUT}"
+          echo "workload_repo=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["workload_repository"].split("/",1)[1])')" >> "${GITHUB_OUTPUT}"
           echo "environment=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["environment"])')" >> "${GITHUB_OUTPUT}"
 
       - name: Render stack
@@ -69,11 +70,12 @@ jobs:
 
       - name: Mint GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ vars.CONTROL_APP_ID }}
+          client-id: ${{ vars.CONTROL_CLIENT_ID }}
           private-key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          repositories: ${{ steps.validate.outputs.workload_repo }}
 
       - name: Open workload PR
         id: pr
@@ -88,7 +90,7 @@ jobs:
       - name: Create Deployment
         id: deploy
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ENVIRONMENT: ${{ steps.validate.outputs.environment }}
           STACK_ID: ${{ steps.validate.outputs.stack_id }}
           PR_URL: ${{ steps.pr.outputs.url }}
