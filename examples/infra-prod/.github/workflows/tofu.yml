@@ -52,6 +52,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: write
     uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@81f7446ca4dfd4066bd46a729e847127053ba1b9
     with:
       working_directory: ${{ matrix.working_directory }}
@@ -59,6 +60,8 @@ jobs:
       aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
       aws_region: us-east-1
       command: plan
+    secrets:
+      modules_git_token: ${{ secrets.MODULES_GIT_TOKEN }}
 
   apply:
     needs: detect
@@ -70,6 +73,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      actions: write
     uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@81f7446ca4dfd4066bd46a729e847127053ba1b9
     with:
       working_directory: ${{ matrix.working_directory }}
@@ -78,3 +82,5 @@ jobs:
       aws_region: us-east-1
       command: apply
       confirm_apply: APPLY
+    secrets:
+      modules_git_token: ${{ secrets.MODULES_GIT_TOKEN }}
