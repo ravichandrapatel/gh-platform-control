@@ -1,13 +1,21 @@
 # gh-platform-control
 
-Thin **IssueOps control plane** for a zero-cost, GitHub-only IDP.
+**IssueOps control plane** for a zero-cost, GitHub-only internal developer platform (IDP).
 
 - Users submit **Issue Forms** to request resources.
-- Control **validates**, **generates** OpenTofu roots, and **opens PRs** on per-env workload repos.
-- Workloads run pinned **`tofu-pipeline`** (plan/apply) against their own AWS account via OIDC.
+- Control **validates**, **generates** OpenTofu stack roots, and **opens PRs** on per-env workload repos (`infra-dev` / `infra-prod`).
+- Workloads run pinned **`tofu-pipeline`** (plan/apply) in their own AWS account via OIDC.
 - Control **updates issue + Deployment status** from workload callbacks.
 
 Does **not** vendor module/action source or apply infrastructure itself.
+
+## Related repos
+
+| Repo | What it does |
+| --- | --- |
+| [`gh-platform-modules`](https://github.com/ravichandrapatel/gh-platform-modules) | Versioned OpenTofu/AWS modules (IaC library) |
+| [`gh-platform-actions`](https://github.com/ravichandrapatel/gh-platform-actions) | Reusable `tofu-pipeline` + Conftest policies |
+| **This repo** | Intake, catalog, codegen, pins, env→workload registry |
 
 ## Quick start (after remotes exist)
 
