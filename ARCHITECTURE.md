@@ -29,11 +29,14 @@ Issue Form → validate → render template → GitHub App PR → workload CI
    (`stacks/<product>-<key>/`) on the target workload repo (no issue suffix).
 4. Uniqueness: fail+attach if the key is claimed by another open control issue,
    an open workload PR, or `main`. Same-issue re-runs attach/reuse one PR.
-5. Control opens a PR (GitHub App) and creates a GitHub Deployment (`queued`).
+5. Control opens a PR (GitHub App) and a **tracking** Deployment named `issueops-<env>`
+   (status only — not an AWS deploy; do not put protection rules here).
 6. Workload CI calls pinned `tofu-pipeline` (plan on PR; apply after merge + Environment gate).
 7. Workload notifies control via `repository_dispatch`; control updates the issue + Deployment.
 
-Control **never** assumes AWS roles for apply. OIDC trust lives on the workload repo.
+Control **never** assumes AWS roles for apply. OIDC trust and real GitHub Environments
+(`dev` / `prod`) live on the **workload** repos (`infra-<env>`), not on control.
+
 
 ## Config map
 

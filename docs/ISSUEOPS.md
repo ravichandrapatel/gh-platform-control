@@ -6,8 +6,18 @@ Primary self-service path for this control plane.
 
 1. **Issues → New issue → Provision S3 bucket** (add products by cloning the form + catalog entry + template).
 2. Workflow `issue-provision` runs when labels include `issueops` and `product:<id>`.
-3. On success: workload PR link, Deployment id, label `status:pr-open`.
+3. On success: workload PR link, tracking Deployment id (`issueops-<env>`), label `status:pr-open`.
 4. On failure: label `status:validation-failed` + run link.
+
+### Control Environments vs workload Environments
+
+| Repo | Environment name | Purpose |
+| --- | --- | --- |
+| `gh-platform-control` | `issueops-dev`, `issueops-prod` | **Tracking only** (issue ↔ PR status). No OIDC, no apply. |
+| `infra-dev` / `infra-prod` | `dev` / `prod` | **Real deploy gates** + AWS OIDC. |
+
+If control shows a bare `dev` Environment (“Ready to deploy to dev”), that was a mistaken
+tracking name — remove it; new runs use `issueops-<env>` only.
 
 ## Natural key (Git source of truth)
 
