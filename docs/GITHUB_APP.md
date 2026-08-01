@@ -6,11 +6,11 @@ Cross-repository PRs require a GitHub App (not a user PAT).
 
 1. Org / user settings → Developer settings → GitHub Apps → New.
 2. Name: `gh-platform-control` (or similar).
-3. Permissions:
+3. Permissions (required — without Pull requests, push works but `gh pr create` fails):
    - Repository **Contents**: Read & write
    - Repository **Pull requests**: Read & write
    - Repository **Metadata**: Read
-4. Install on every workload repo (`infra-dev`, `infra-prod`, …).
+4. Install on every workload repo (`infra-dev`, `infra-prod`, …). After changing permissions, click **Accept** on each installation.
 5. Generate a private key. Copy the App **Client ID** (not the numeric App ID).
 
 ## Secrets / variables (**gh-platform-control** only)

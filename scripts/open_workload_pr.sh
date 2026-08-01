@@ -28,9 +28,9 @@ trap cleanup EXIT
 export GH_TOKEN="${TOKEN}"
 export GIT_TERMINAL_PROMPT=0
 
-# Reuse an existing open PR for this head if present (idempotent retests).
-existing_pr="$(gh pr list --repo "${workload_repository}" --head "${owner}:${branch}" --state open --json url --jq '.[0].url' 2>/dev/null || true)"
-if [[ -n "${existing_pr}" ]]; then
+# Reuse an existing open PR for this head if present (REST; App tokens often lack GraphQL).
+existing_pr="$(gh api "repos/${workload_repository}/pulls?state=open&head=${owner}:${branch}" --jq '.[0].html_url' 2>/dev/null || true)"
+if [[ -n "${existing_pr}" && "${existing_pr}" != "null" ]]; then
   echo "PR_URL=${existing_pr}"
   echo "${existing_pr}" > "${ROOT}/.pr-url"
   echo "${branch}" > "${ROOT}/.pr-branch"
@@ -70,13 +70,9 @@ EOF
   git push -u origin "${branch}"
 fi
 
-# App tokens need an explicit head (owner:branch); do not rely on current checkout alone.
-pr_url="$(gh pr create \
-  --repo "${workload_repository}" \
-  --base "${base_branch}" \
-  --head "${owner}:${branch}" \
-  --title "feat(issueops): ${stack_id}" \
-  --body "$(cat <<EOF
+# Prefer REST PR create — more reliable for GitHub App installation tokens.
+title="feat(issueops): ${stack_id}"
+body="$(cat <<EOF
 ## Summary
 - Product: \`${product}\`
 - Environment: \`${environment}\`
@@ -87,9 +83,20 @@ pr_url="$(gh pr create \
 - [ ] Review generated OpenTofu root
 - [ ] Confirm CI plan (Checkov / Conftest / tofu plan) is green
 - [ ] Merge to apply (prod requires Environment approval)
-
 EOF
-)")"
+)"
+
+if ! pr_url="$(gh api --method POST "repos/${workload_repository}/pulls" \
+  -f title="${title}" \
+  -f head="${branch}" \
+  -f base="${base_branch}" \
+  -f body="${body}" \
+  --jq .html_url 2>/tmp/pr-create.err)"; then
+  echo "ERROR: failed to open PR. Ensure the GitHub App has Pull requests: Read and write on ${workload_repository}." >&2
+  echo "Branch pushed: https://github.com/${workload_repository}/compare/${base_branch}...${branch}?expand=1" >&2
+  cat /tmp/pr-create.err >&2 || true
+  exit 1
+fi
 
 echo "PR_URL=${pr_url}"
 echo "${pr_url}" > "${ROOT}/.pr-url"

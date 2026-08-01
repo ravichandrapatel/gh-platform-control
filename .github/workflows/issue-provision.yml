@@ -96,6 +96,9 @@ jobs:
           private-key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.validate.outputs.workload_repo }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-metadata: read
 
       - name: Open workload PR
         id: pr
