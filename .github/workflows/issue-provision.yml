@@ -99,6 +99,15 @@ jobs:
           # Token inherits App installation permissions. The App MUST grant
           # Contents + Pull requests (RW) on workload repos or PR create fails.
 
+      - name: Reject duplicate resource
+        id: duplicate
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PYTHONPATH: scripts
+        run: |
+          set -euo pipefail
+          python3 scripts/check_duplicate_resource.py --resolved-json /tmp/resolved.json
+
       - name: Open workload PR
         id: pr
         env:
@@ -186,6 +195,7 @@ jobs:
           VALIDATE: ${{ steps.validate.outcome }}
           RENDER: ${{ steps.render.outcome }}
           APP: ${{ steps.app-token.outcome }}
+          DUP: ${{ steps.duplicate.outcome }}
           PR: ${{ steps.pr.outcome }}
           DEPLOY: ${{ steps.deploy.outcome }}
         run: |
@@ -195,9 +205,9 @@ jobs:
           if [[ "${CFG}" == "failure" || "${APP}" == "failure" ]]; then
             label="status:config-error"
             reason="config (pins/App credentials/token)"
-          elif [[ "${PARSE}" == "failure" || "${VALIDATE}" == "failure" || "${RENDER}" == "failure" ]]; then
+          elif [[ "${PARSE}" == "failure" || "${VALIDATE}" == "failure" || "${RENDER}" == "failure" || "${DUP}" == "failure" ]]; then
             label="status:validation-failed"
-            reason="validation (form/catalog/render)"
+            reason="validation (form/catalog/render/duplicate)"
           elif [[ "${PR}" == "failure" || "${DEPLOY}" == "failure" ]]; then
             label="status:provision-failed"
             reason="provision (PR/deployment)"

@@ -15,6 +15,7 @@ Primary self-service path for this control plane.
 | --- | --- | --- |
 | Form schema | Issue Form YAML | required fields, dropdowns |
 | Catalog | `scripts/validate_request.py` | patterns, enums, env allowlist |
+| Duplicate key | `scripts/check_duplicate_resource.py` | same `bucket_name` on `main` or any open workload PR |
 | Control CI | `validate-control.sh` | registry + templates exist |
 | Workload CI | `tofu-pipeline` | Checkov, plan, Conftest |
 | Apply gate | Workload Environment + `confirm_apply` | human approval on prod |
