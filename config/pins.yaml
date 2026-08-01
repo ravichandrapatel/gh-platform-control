@@ -1,0 +1,15 @@
+# Immutable pins only. Floating refs (main/master/latest/HEAD) are rejected by scripts and Commons.
+# Replace OWNER with your GitHub org after remotes exist.
+
+actions:
+  repository: OWNER/gh-platform-actions
+  # Set to a 40-char commit SHA after the first actions release commit is known.
+  ref: REPLACE_WITH_ACTIONS_COMMIT_SHA
+
+modules:
+  repository: OWNER/gh-platform-modules
+  # Set to an annotated SemVer tag after the first modules release.
+  ref: v0.0.0
+
+aws:
+  region: us-east-1

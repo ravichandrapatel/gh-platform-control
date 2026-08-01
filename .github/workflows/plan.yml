@@ -1,0 +1,97 @@
+name: plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: sandbox or prod
+        required: true
+        default: sandbox
+        type: choice
+        options: [sandbox, prod]
+      module_path:
+        description: Path inside modules repo
+        required: true
+        default: examples/s3-bucket
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  validate-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout control
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Validate pins
+        run: |
+          set -euo pipefail
+          ALLOW_PIN_PLACEHOLDERS=1 ./scripts/validate-pins.sh
+
+  plan:
+    needs: validate-pins
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout control
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Read pins
+        id: pins
+        run: |
+          set -euo pipefail
+          actions_repo=$(awk '/^actions:/{f=1} f&&/repository:/{print $2; exit}' config/pins.yaml)
+          actions_ref=$(awk '/^actions:/{f=1} f&&/ref:/{print $2; exit}' config/pins.yaml)
+          modules_repo=$(awk '/^modules:/{f=1} f&&/repository:/{print $2; exit}' config/pins.yaml)
+          modules_ref=$(awk '/^modules:/{f=1} f&&/ref:/{print $2; exit}' config/pins.yaml)
+          echo "actions_repo=${actions_repo}" >> "${GITHUB_OUTPUT}"
+          echo "actions_ref=${actions_ref}" >> "${GITHUB_OUTPUT}"
+          echo "modules_repo=${modules_repo}" >> "${GITHUB_OUTPUT}"
+          echo "modules_ref=${modules_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Fail on placeholder pins
+        env:
+          ACTIONS_REF: ${{ steps.pins.outputs.actions_ref }}
+          MODULES_REF: ${{ steps.pins.outputs.modules_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "${ACTIONS_REF}" == "REPLACE_WITH_ACTIONS_COMMIT_SHA" || "${MODULES_REF}" == "v0.0.0" ]]; then
+            echo "::error::Update config/pins.yaml with real immutable refs before running plan against AWS."
+            exit 1
+          fi
+
+      - name: Checkout actions (pinned)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ steps.pins.outputs.actions_repo }}
+          ref: ${{ steps.pins.outputs.actions_ref }}
+          path: .gh-platform-actions
+
+      - name: Load environment role
+        id: envcfg
+        env:
+          ENV_NAME: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          file="config/environments/${ENV_NAME}.yaml"
+          role=$(awk '/aws_role_arn:/{print $2; exit}' "${file}")
+          region=$(awk '/aws_region:/{print $2; exit}' "${file}")
+          echo "role=${role}" >> "${GITHUB_OUTPUT}"
+          echo "region=${region}" >> "${GITHUB_OUTPUT}"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@ececac1a45f3b08a01d2dd070d28d111c5fe6722 # v4.1.0
+        with:
+          role-to-assume: ${{ steps.envcfg.outputs.role }}
+          aws-region: ${{ steps.envcfg.outputs.region }}
+
+      - name: OpenTofu plan via Commons
+        uses: ./.gh-platform-actions/actions/iac/commons
+        with:
+          modules_repository: ${{ steps.pins.outputs.modules_repo }}
+          modules_ref: ${{ steps.pins.outputs.modules_ref }}
+          module_path: ${{ inputs.module_path }}
+          command: plan
+          aws_region: ${{ steps.envcfg.outputs.region }}
