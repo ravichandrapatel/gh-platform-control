@@ -1,6 +1,6 @@
 # FILE_NAME: issue-provision.yml
 # DESCRIPTION: IssueOps — validate form, render stack, open workload PR, track Deployment.
-# VERSION: 0.1.0
+# VERSION: 0.2.0
 
 name: issue-provision
 
@@ -24,12 +24,14 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Validate control config
+        id: cfg
         run: |
           set -euo pipefail
           ALLOW_PIN_PLACEHOLDERS=1 ./scripts/validate-pins.sh
           ALLOW_PLACEHOLDERS=1 ./scripts/validate-control.sh
 
       - name: Parse issue body
+        id: parse
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
           PYTHONPATH: scripts
@@ -59,6 +61,7 @@ jobs:
           echo "environment=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["environment"])')" >> "${GITHUB_OUTPUT}"
 
       - name: Render stack
+        id: render
         env:
           PYTHONPATH: scripts
         run: |
@@ -120,6 +123,7 @@ jobs:
             -f log_url="${PR_URL}"
 
       - name: Update issue
+        id: update-issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ steps.pr.outputs.url }}
@@ -131,6 +135,9 @@ jobs:
           gh issue edit "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --remove-label "status:pending-validation" \
+            --remove-label "status:validation-failed" \
+            --remove-label "status:config-error" \
+            --remove-label "status:provision-failed" \
             --add-label "status:pr-open"
           gh issue comment "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
@@ -148,16 +155,45 @@ jobs:
           EOF
           )"
 
-      - name: Mark validation failure
+      - name: Mark failure
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CFG: ${{ steps.cfg.outcome }}
+          PARSE: ${{ steps.parse.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          RENDER: ${{ steps.render.outcome }}
+          APP: ${{ steps.app-token.outcome }}
+          PR: ${{ steps.pr.outcome }}
+          DEPLOY: ${{ steps.deploy.outcome }}
         run: |
           set -euo pipefail
+          label="status:provision-failed"
+          reason="provision"
+          if [[ "${CFG}" == "failure" || "${APP}" == "failure" ]]; then
+            label="status:config-error"
+            reason="config (pins/App credentials/token)"
+          elif [[ "${PARSE}" == "failure" || "${VALIDATE}" == "failure" || "${RENDER}" == "failure" ]]; then
+            label="status:validation-failed"
+            reason="validation (form/catalog/render)"
+          elif [[ "${PR}" == "failure" || "${DEPLOY}" == "failure" ]]; then
+            label="status:provision-failed"
+            reason="provision (PR/deployment)"
+          fi
+
           gh issue edit "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --remove-label "status:pending-validation" \
-            --add-label "status:validation-failed" || true
+            --remove-label "status:validation-failed" \
+            --remove-label "status:config-error" \
+            --remove-label "status:provision-failed" \
+            --add-label "${label}" || true
           gh issue comment "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
-            --body "### IssueOps validation/provision failed\n\nSee workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true
+            --body "$(cat <<EOF
+          ### IssueOps failed (\`${reason}\`)
+
+          Label: \`${label}\`
+          Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EOF
+          )" || true

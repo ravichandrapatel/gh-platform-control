@@ -31,9 +31,26 @@ Primary self-service path for this control plane.
 | `status:applied` / `apply-failed` | From `status-sync` |
 | `status:validation-failed` | Control rejected request |
 
+## Bootstrap labels
+
+```bash
+./scripts/bootstrap-labels.sh OWNER/gh-platform-control
+```
+
+Creates `issueops`, `product:*`, and `status:*` labels (including `status:config-error` vs `status:validation-failed`).
+
+## Failure labels
+
+| Label | Meaning |
+| --- | --- |
+| `status:validation-failed` | Form/catalog/render failed |
+| `status:config-error` | Pins/App token/credentials failed |
+| `status:provision-failed` | Workload PR or Deployment failed |
+
 ## Adding a product
 
 1. `config/catalog/products/<id>.yaml`
 2. `templates/<id>/*.tmpl`
 3. `.github/ISSUE_TEMPLATE/<id>.yml` with labels `issueops` + `product:<id>`
 4. Extend `issue-provision.yml` `if:` (or generalize product detection from labels).
+5. `./scripts/bootstrap-labels.sh` for any new `product:*` label.

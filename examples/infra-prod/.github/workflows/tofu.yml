@@ -52,7 +52,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: OWNER/gh-platform-actions/.github/workflows/tofu-pipeline.yml@REPLACE_WITH_ACTIONS_COMMIT_SHA
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@81f7446ca4dfd4066bd46a729e847127053ba1b9
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: prod
@@ -70,7 +70,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: OWNER/gh-platform-actions/.github/workflows/tofu-pipeline.yml@REPLACE_WITH_ACTIONS_COMMIT_SHA
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@81f7446ca4dfd4066bd46a729e847127053ba1b9
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: prod

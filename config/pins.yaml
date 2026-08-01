@@ -3,13 +3,12 @@
 
 actions:
   repository: ravichandrapatel/gh-platform-actions
-  # Pin to tofu-pipeline branch tip (validation-only; replace with release SHA when ready).
-  ref: 7ad28f6e7a7375f1ba6e78d6d9cd40f4eb0eba22
+  # Immutable SHA on main that includes tofu-pipeline.
+  ref: 81f7446ca4dfd4066bd46a729e847127053ba1b9
 
 modules:
   repository: ravichandrapatel/gh-platform-modules
-  # Default tagging module pin used by generated stacks (product catalog overrides path modules).
-  tagging_ref: tagging/v0.0.0
+  tagging_ref: tagging/v1.0.0
 
 aws:
   region: us-east-1

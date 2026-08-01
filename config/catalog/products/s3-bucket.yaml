@@ -6,8 +6,7 @@ template: s3-bucket
 issue_form: s3-bucket.yml
 module:
   path: s3
-  # Per-module annotated tag from gh-platform-modules (replace after first release).
-  ref: s3/v0.0.0
+  ref: s3/v1.0.0
 inputs:
   environment:
     required: true
