@@ -71,6 +71,23 @@ jobs:
             --root . \
             --out-dir /tmp/stack-out
 
+      - name: Require App credentials on control
+        id: require-creds
+        env:
+          CLIENT_ID: ${{ vars.CONTROL_CLIENT_ID }}
+          PRIVATE_KEY_PRESENT: ${{ secrets.CONTROL_APP_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLIENT_ID}" ]]; then
+            echo "::error::CONTROL_CLIENT_ID repository variable is missing on this control repo (not the workload repo)."
+            exit 1
+          fi
+          if [[ "${PRIVATE_KEY_PRESENT}" != "true" ]]; then
+            echo "::error::CONTROL_APP_PRIVATE_KEY repository secret is missing on this control repo (not the workload repo)."
+            exit 1
+          fi
+          echo "OK: App credentials present on control"
+
       - name: Mint GitHub App token
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
