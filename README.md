@@ -31,6 +31,7 @@ Does **not** vendor module/action source or apply infrastructure itself.
 | Doc | Topic |
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Control vs workload split |
+| [docs/DAY_OPERATIONS.md](docs/DAY_OPERATIONS.md) | **Day-to-day runbook** (provision, pins, releases, demo) |
 | [docs/ISSUEOPS.md](docs/ISSUEOPS.md) | Forms, labels, validation |
 | [docs/PUBLIC_DEMO.md](docs/PUBLIC_DEMO.md) | Public-repo IssueOps hardening |
 | [docs/WORKLOAD_REPOS.md](docs/WORKLOAD_REPOS.md) | Env workload layout |
