@@ -20,5 +20,10 @@ inputs:
   enable_versioning:
     required: true
     enum: ["true", "false"]
+# Deterministic GitOps path/branch (no issue suffix).
 stack_id_from:
+  - product
+  - bucket_name
+# Uniqueness within an environment (workload repo). Git is source of truth.
+uniqueness_key_from:
   - bucket_name

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # FILE_NAME: validate_request.py
 # DESCRIPTION: Validate parsed Issue Form JSON against catalog + environments.
-# VERSION: 0.1.0
+# VERSION: 0.2.0
 from __future__ import annotations
 
 import argparse
@@ -23,6 +23,22 @@ def load_product(catalog_dir: Path, product_id: str) -> dict:
     if not path.is_file():
         fail(f"unknown product '{product_id}' (missing {path})")
     return load_yaml_file(str(path))
+
+
+def slug_part(value: str) -> str:
+    return re.sub(r"[^a-z0-9-]+", "-", value.lower()).strip("-")
+
+
+def build_parts(product: dict, product_id: str, req: dict, keys: list[str]) -> list[str]:
+    parts: list[str] = []
+    for key in keys:
+        if key == "product":
+            parts.append(product_id)
+        else:
+            if key not in req or not str(req.get(key, "")).strip():
+                fail(f"stack/natural key field '{key}' missing from request")
+            parts.append(slug_part(str(req[key])))
+    return [p for p in parts if p]
 
 
 def main() -> int:
@@ -64,14 +80,17 @@ def main() -> int:
     environment = str(req.get("environment", "")).strip()
     env_cfg = envs[environment]
 
-    stack_parts = []
-    for key in product.get("stack_id_from") or ["product"]:
-        if key == "product":
-            stack_parts.append(args.product)
-        else:
-            stack_parts.append(re.sub(r"[^a-z0-9-]+", "-", str(req[key]).lower()).strip("-"))
-    stack_parts.append(f"issue-{args.issue_number}")
-    stack_id = "-".join(p for p in stack_parts if p)
+    # Natural-key stack id (no issue suffix) — deterministic branch/path for races.
+    stack_keys = product.get("stack_id_from") or ["product"]
+    stack_parts = build_parts(product, args.product, req, stack_keys)
+    stack_id = "-".join(stack_parts)
+
+    uniq_keys = product.get("uniqueness_key_from") or [
+        k for k in stack_keys if k != "product"
+    ]
+    uniq_parts = build_parts(product, args.product, req, uniq_keys)
+    # Scoped by environment (each env = own workload repo / AWS account).
+    natural_key = f"{args.product}:{environment}:{':'.join(uniq_parts)}"
 
     modules_repo = (pins.get("modules") or {}).get("repository") or "OWNER/gh-platform-modules"
     tagging_ref = (pins.get("modules") or {}).get("tagging_ref") or "tagging/v0.0.0"
@@ -82,6 +101,8 @@ def main() -> int:
         "environment": environment,
         "stack_id": stack_id,
         "stack_path": f"stacks/{stack_id}",
+        "natural_key": natural_key,
+        "uniqueness_inputs": {k: str(req.get(k, "")).strip() for k in uniq_keys if k != "product"},
         "workload_repository": env_cfg["workload_repository"],
         "github_environment": env_cfg.get("github_environment", environment),
         "aws_role_arn": env_cfg["aws_role_arn"],
@@ -101,7 +122,15 @@ def main() -> int:
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(resolved, f, indent=2, sort_keys=True)
         f.write("\n")
-    print(json.dumps({"stack_id": stack_id, "workload_repository": resolved["workload_repository"]}))
+    print(
+        json.dumps(
+            {
+                "stack_id": stack_id,
+                "natural_key": natural_key,
+                "workload_repository": resolved["workload_repository"],
+            }
+        )
+    )
     return 0
 
 

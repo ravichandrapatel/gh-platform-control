@@ -74,3 +74,11 @@ jobs:
             --out-dir /tmp/stack-out
           test -f /tmp/stack-out/main.tf
           test -f /tmp/stack-out/stack-metadata.json
+          python3 - <<'PY'
+          import json
+          r = json.load(open("/tmp/resolved.json"))
+          assert r["stack_id"] == "s3-bucket-example-bucket-unique-12345", r["stack_id"]
+          assert r["natural_key"] == "s3-bucket:dev:example-bucket-unique-12345", r["natural_key"]
+          assert "issue-" not in r["stack_id"]
+          print("natural-key ok", r["stack_id"], r["natural_key"])
+          PY

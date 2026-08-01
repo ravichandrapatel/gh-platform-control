@@ -1,6 +1,6 @@
 # FILE_NAME: issue-provision.yml
 # DESCRIPTION: IssueOps — validate form, render stack, open workload PR, track Deployment.
-# VERSION: 0.2.0
+# VERSION: 0.3.0
 
 name: issue-provision
 
@@ -103,10 +103,14 @@ jobs:
         id: duplicate
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CONTROL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYTHONPATH: scripts
         run: |
           set -euo pipefail
-          python3 scripts/check_duplicate_resource.py --resolved-json /tmp/resolved.json
+          python3 scripts/check_duplicate_resource.py \
+            --resolved-json /tmp/resolved.json \
+            --out-dir . \
+            --attach
 
       - name: Open workload PR
         id: pr
@@ -117,6 +121,7 @@ jobs:
           chmod +x scripts/open_workload_pr.sh
           scripts/open_workload_pr.sh /tmp/resolved.json /tmp/stack-out "${APP_TOKEN}"
           echo "url=$(cat .pr-url)" >> "${GITHUB_OUTPUT}"
+          echo "mode=$(cat .pr-mode 2>/dev/null || echo created)" >> "${GITHUB_OUTPUT}"
 
       - name: Create Deployment
         id: deploy
@@ -170,16 +175,22 @@ jobs:
             --remove-label "status:config-error" \
             --remove-label "status:provision-failed" \
             --add-label "status:pr-open"
+          mode="${{ steps.pr.outputs.mode }}"
+          title="IssueOps accepted"
+          if [[ "${mode}" == "attached" ]]; then
+            title="IssueOps attached (same-issue reuse)"
+          fi
           gh issue comment "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --body "$(cat <<EOF
-          ### IssueOps accepted
+          ### ${title}
 
           | Field | Value |
           | --- | --- |
           | Stack | \`${STACK_ID}\` |
           | Workload | \`${WORKLOAD}\` |
           | Pull request | ${PR_URL} |
+          | Mode | \`${mode}\` |
           | Deployment id | \`${DEP_ID}\` |
 
           Next: review the PR; workload CI runs \`tofu-pipeline\` plan. Merge + Environment approval applies.
@@ -220,6 +231,12 @@ jobs:
             --remove-label "status:config-error" \
             --remove-label "status:provision-failed" \
             --add-label "${label}" || true
+
+          # Duplicate step already posted fail+attach comments.
+          if [[ "${DUP}" == "failure" && -f .duplicate-conflicts.md ]]; then
+            exit 0
+          fi
+
           gh issue comment "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --body "$(cat <<EOF
