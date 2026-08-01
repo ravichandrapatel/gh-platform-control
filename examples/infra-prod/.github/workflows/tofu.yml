@@ -53,7 +53,7 @@ jobs:
       contents: read
       id-token: write
       actions: write
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@81f7446ca4dfd4066bd46a729e847127053ba1b9
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@abb8ce241fb130b69ba9512bc5c9f722eb3795a0
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: prod
@@ -74,7 +74,7 @@ jobs:
       contents: read
       id-token: write
       actions: write
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@81f7446ca4dfd4066bd46a729e847127053ba1b9
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@abb8ce241fb130b69ba9512bc5c9f722eb3795a0
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: prod

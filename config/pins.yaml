@@ -4,7 +4,7 @@
 actions:
   repository: ravichandrapatel/gh-platform-actions
   # Immutable SHA on main that includes tofu-pipeline.
-  ref: 81f7446ca4dfd4066bd46a729e847127053ba1b9
+  ref: abb8ce241fb130b69ba9512bc5c9f722eb3795a0
 
 modules:
   repository: ravichandrapatel/gh-platform-modules
