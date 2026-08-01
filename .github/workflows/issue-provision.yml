@@ -96,9 +96,8 @@ jobs:
           private-key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ steps.validate.outputs.workload_repo }}
-          permission-contents: write
-          permission-pull-requests: write
-          permission-metadata: read
+          # Token inherits App installation permissions. The App MUST grant
+          # Contents + Pull requests (RW) on workload repos or PR create fails.
 
       - name: Open workload PR
         id: pr
