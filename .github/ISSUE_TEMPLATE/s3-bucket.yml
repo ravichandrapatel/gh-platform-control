@@ -1,0 +1,46 @@
+name: Provision S3 bucket
+description: Request an S3 bucket in a target environment (IssueOps → workload PR).
+title: "[provision][s3-bucket] "
+labels: ["issueops", "product:s3-bucket", "status:pending-validation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submit this form to open a GitOps PR on the environment workload repo.
+        Control validates inputs, generates stack code, and tracks Deployment status.
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Maps to an AWS account + workload repository.
+      options:
+        - dev
+        - prod
+    validations:
+      required: true
+  - type: input
+    id: bucket_name
+    attributes:
+      label: Bucket name
+      description: Globally unique S3 bucket name (lowercase).
+      placeholder: my-app-assets-dev
+    validations:
+      required: true
+  - type: input
+    id: project
+    attributes:
+      label: Project
+      description: Tagging project name (PascalCase or alnum).
+      placeholder: MyApp
+    validations:
+      required: true
+  - type: dropdown
+    id: enable_versioning
+    attributes:
+      label: Enable versioning
+      options:
+        - "true"
+        - "false"
+      default: 0
+    validations:
+      required: true

@@ -1,0 +1,161 @@
+# FILE_NAME: issue-provision.yml
+# DESCRIPTION: IssueOps — validate form, render stack, open workload PR, track Deployment.
+# VERSION: 0.1.0
+
+name: issue-provision
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  deployments: write
+
+jobs:
+  provision:
+    if: >-
+      contains(github.event.issue.labels.*.name, 'issueops') &&
+      contains(github.event.issue.labels.*.name, 'product:s3-bucket')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout control
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate control config
+        run: |
+          set -euo pipefail
+          ALLOW_PIN_PLACEHOLDERS=1 ./scripts/validate-pins.sh
+          ALLOW_PLACEHOLDERS=1 ./scripts/validate-control.sh
+
+      - name: Parse issue body
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          PYTHONPATH: scripts
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${ISSUE_BODY}" > /tmp/issue-body.md
+          python3 scripts/parse_issue.py --body-file /tmp/issue-body.md --out /tmp/request.json
+
+      - name: Validate request
+        id: validate
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          CONTROL_REPO: ${{ github.repository }}
+          PYTHONPATH: scripts
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_request.py \
+            --request-json /tmp/request.json \
+            --product s3-bucket \
+            --root . \
+            --issue-number "${ISSUE_NUMBER}" \
+            --control-repo "${CONTROL_REPO}" \
+            --out /tmp/resolved.json
+          echo "stack_id=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["stack_id"])')" >> "${GITHUB_OUTPUT}"
+          echo "workload=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["workload_repository"])')" >> "${GITHUB_OUTPUT}"
+          echo "environment=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["environment"])')" >> "${GITHUB_OUTPUT}"
+
+      - name: Render stack
+        env:
+          PYTHONPATH: scripts
+        run: |
+          set -euo pipefail
+          python3 scripts/render_stack.py \
+            --resolved-json /tmp/resolved.json \
+            --root . \
+            --out-dir /tmp/stack-out
+
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ vars.CONTROL_APP_ID }}
+          private-key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Open workload PR
+        id: pr
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/open_workload_pr.sh
+          scripts/open_workload_pr.sh /tmp/resolved.json /tmp/stack-out "${APP_TOKEN}"
+          echo "url=$(cat .pr-url)" >> "${GITHUB_OUTPUT}"
+
+      - name: Create Deployment
+        id: deploy
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ENVIRONMENT: ${{ steps.validate.outputs.environment }}
+          STACK_ID: ${{ steps.validate.outputs.stack_id }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          payload="$(python3 -c 'import json,os; print(json.dumps({"stack_id":os.environ["STACK_ID"],"pr":os.environ["PR_URL"],"issue":int(os.environ["ISSUE_NUMBER"])}))')"
+          resp="$(gh api --method POST "/repos/${{ github.repository }}/deployments" --input - <<EOF
+          {
+            "ref": "${{ github.sha }}",
+            "environment": "${ENVIRONMENT}",
+            "description": "IssueOps ${STACK_ID}",
+            "auto_merge": false,
+            "required_contexts": [],
+            "payload": ${payload}
+          }
+          EOF
+          )"
+          dep_id="$(printf '%s' "${resp}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+          echo "id=${dep_id}" >> "${GITHUB_OUTPUT}"
+          gh api \
+            --method POST \
+            "/repos/${{ github.repository }}/deployments/${dep_id}/statuses" \
+            -f state="pending" \
+            -f description="Workload PR opened" \
+            -f environment_url="${PR_URL}" \
+            -f log_url="${PR_URL}"
+
+      - name: Update issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+          STACK_ID: ${{ steps.validate.outputs.stack_id }}
+          WORKLOAD: ${{ steps.validate.outputs.workload }}
+          DEP_ID: ${{ steps.deploy.outputs.id }}
+        run: |
+          set -euo pipefail
+          gh issue edit "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label "status:pending-validation" \
+            --add-label "status:pr-open"
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "$(cat <<EOF
+          ### IssueOps accepted
+
+          | Field | Value |
+          | --- | --- |
+          | Stack | \`${STACK_ID}\` |
+          | Workload | \`${WORKLOAD}\` |
+          | Pull request | ${PR_URL} |
+          | Deployment id | \`${DEP_ID}\` |
+
+          Next: review the PR; workload CI runs \`tofu-pipeline\` plan. Merge + Environment approval applies.
+          EOF
+          )"
+
+      - name: Mark validation failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh issue edit "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label "status:pending-validation" \
+            --add-label "status:validation-failed" || true
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "### IssueOps validation/provision failed\n\nSee workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true

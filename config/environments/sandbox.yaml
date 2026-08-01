@@ -1,5 +1,0 @@
-name: sandbox
-# GitHub Environment name must match workflow `environment:`
-github_environment: sandbox
-aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-sandbox
-aws_region: us-east-1

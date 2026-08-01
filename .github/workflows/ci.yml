@@ -1,3 +1,7 @@
+# FILE_NAME: ci.yml
+# DESCRIPTION: Validate pins, environments registry, catalog, and templates.
+# VERSION: 0.2.0
+
 name: ci
 
 on:
@@ -10,15 +14,22 @@ permissions:
   contents: read
 
 jobs:
-  pins-and-layout:
+  control-config:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Validate pin shape
+
+      - name: Validate pins
         run: |
           set -euo pipefail
           ALLOW_PIN_PLACEHOLDERS=1 ./scripts/validate-pins.sh
+
+      - name: Validate control registry
+        run: |
+          set -euo pipefail
+          ALLOW_PLACEHOLDERS=1 ./scripts/validate-control.sh
+
       - name: Reject floating words in pins
         run: |
           set -euo pipefail
@@ -26,3 +37,40 @@ jobs:
             echo "::error::floating ref in pins.yaml"
             exit 1
           fi
+
+      - name: Smoke parse + validate + render
+        env:
+          PYTHONPATH: scripts
+        run: |
+          set -euo pipefail
+          cat > /tmp/issue-body.md <<'EOF'
+          ### Environment
+
+          dev
+
+          ### Bucket name
+
+          example-bucket-unique-12345
+
+          ### Project
+
+          ExampleApp
+
+          ### Enable versioning
+
+          true
+          EOF
+          python3 scripts/parse_issue.py --body-file /tmp/issue-body.md --out /tmp/request.json
+          python3 scripts/validate_request.py \
+            --request-json /tmp/request.json \
+            --product s3-bucket \
+            --root . \
+            --issue-number 1 \
+            --control-repo OWNER/gh-platform-control \
+            --out /tmp/resolved.json
+          python3 scripts/render_stack.py \
+            --resolved-json /tmp/resolved.json \
+            --root . \
+            --out-dir /tmp/stack-out
+          test -f /tmp/stack-out/main.tf
+          test -f /tmp/stack-out/stack-metadata.json

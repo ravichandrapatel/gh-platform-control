@@ -1,0 +1,25 @@
+# Product catalog entry — allowlisted inputs for Issue Form "Provision S3 bucket".
+id: s3-bucket
+title: S3 Bucket
+description: Provision an S3 bucket via golden-path module.
+template: s3-bucket
+issue_form: s3-bucket.yml
+module:
+  path: s3
+  # Per-module annotated tag from gh-platform-modules (replace after first release).
+  ref: s3/v0.0.0
+inputs:
+  environment:
+    required: true
+    from_environments: true
+  bucket_name:
+    required: true
+    pattern: "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+  project:
+    required: true
+    pattern: "^[A-Za-z][A-Za-z0-9_-]{1,63}$"
+  enable_versioning:
+    required: true
+    enum: ["true", "false"]
+stack_id_from:
+  - bucket_name

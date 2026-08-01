@@ -17,3 +17,8 @@ override.tf.json
 .idea/
 .vscode/
 *.swp
+__pycache__/
+*.py[cod]
+.pr-url
+.pr-branch
+.workload-repo

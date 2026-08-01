@@ -1,5 +1,6 @@
+# Mirror of the `prod` row from gh-platform-control config/environments.yaml
 name: prod
 github_environment: prod
 aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
 aws_region: us-east-1
-# Require reviewers on the GitHub Environment before apply/destroy.
+control_repository: OWNER/gh-platform-control

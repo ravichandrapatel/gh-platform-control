@@ -1,24 +1,53 @@
-# gh-platform architecture
+# gh-platform-control architecture
 
-## Repos
+Zero-cost, GitHub-only IDP control plane. **One** control repo for intake;
+**per-env workload repos** (one AWS account each) own OpenTofu roots and apply.
 
-| Repo | Layer | Release unit |
+## Layers
+
+| Repo | Role | Release unit |
 | --- | --- | --- |
-| `gh-platform-modules` | IaC (OpenTofu) | Annotated SemVer tags |
-| `gh-platform-actions` | Commons + Actions + reusable workflows | Commit SHA or immutable tags |
-| `gh-platform-control` | Deployment / control | Config + workflows on `main` |
+| `gh-platform-control` | IssueOps intake, catalog, pins, codegen, status | Config + workflows on `main` |
+| `infra-<env>` (workload) | GitOps stacks + `tofu-pipeline` CI | Protected `main` per account |
+| `gh-platform-actions` | Reusable `tofu-pipeline` + policies | Commit SHA |
+| `gh-platform-modules` | OpenTofu modules | Annotated SemVer tags (`s3/vX.Y.Z`) |
 
 ## Flow
 
-1. Operator runs `workflow_dispatch` on control (`plan` / `apply` / `destroy`).
-2. Control reads `config/pins.yaml` (or workflow inputs that must match allowed pins).
-3. Control checks out `gh-platform-actions` at `actions_ref` (SHA).
-4. Action runs Commons → checks out `gh-platform-modules` at `modules_ref` (tag).
-5. OpenTofu `plan` by default; `apply`/`destroy` require `confirm_apply=APPLY` + Environment approval.
+```text
+Issue Form → validate → render template → GitHub App PR → workload CI
+                                                              ↓
+                                         Checkov → plan → Conftest → gated apply
+                                                              ↓
+                              status-sync ← repository_dispatch ← workload
+                                         → issue labels + Deployment
+```
 
-## Bumping pins
+1. Operator opens an Issue Form (product + environment + params).
+2. Control parses the body, validates against `config/catalog/` + `config/environments.yaml`.
+3. Control renders `templates/<product>/` into `stacks/<id>/` on the target workload repo.
+4. Control opens a PR (GitHub App) and creates a GitHub Deployment (`queued`).
+5. Workload CI calls pinned `tofu-pipeline` (plan on PR; apply after merge + Environment gate).
+6. Workload notifies control via `repository_dispatch`; control updates the issue + Deployment.
 
-1. Release modules tag from `gh-platform-modules` `main`.
-2. Merge actions changes; note the commit SHA on `gh-platform-actions` `main`.
-3. Open a PR on **this** repo updating `config/pins.yaml`.
-4. Merge via protected `main`; then run `plan` before any `apply`.
+Control **never** assumes AWS roles for apply. OIDC trust lives on the workload repo.
+
+## Config map
+
+| Path | Purpose |
+| --- | --- |
+| `config/pins.yaml` | Immutable `gh-platform-actions` SHA |
+| `config/environments.yaml` | env → workload repo, account, role, region |
+| `config/catalog/products/*.yaml` | Product allowlists + module pin hints |
+| `templates/<product>/` | Codegen skeletons |
+| `examples/infra-dev/`, `examples/infra-prod/` | Workload starters (dev + prod only) |
+
+## Extensibility
+
+MVP unit is **environment = AWS account**. Add rows to `environments.yaml` (and later
+team/product dimensions) without copying this control plane.
+
+## Break-glass
+
+Do not run OpenTofu inside this repo. Emergency changes: PR directly on the
+workload repo (same `tofu-pipeline` gates).

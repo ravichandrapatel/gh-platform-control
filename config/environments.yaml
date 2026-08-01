@@ -1,0 +1,21 @@
+# Environment registry: env name → AWS account + workload GitOps repo.
+# MVP: only dev and prod (one AWS account each).
+
+environments:
+  # Starter: examples/infra-dev/ → OWNER/infra-dev
+  dev:
+    workload_repository: OWNER/infra-dev
+    github_environment: dev
+    aws_account_id: "REPLACE_ACCOUNT_ID"
+    aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-dev
+    aws_region: us-east-1
+    tagging_environment: NON-PROD
+
+  # Starter: examples/infra-prod/ → OWNER/infra-prod
+  prod:
+    workload_repository: OWNER/infra-prod
+    github_environment: prod
+    aws_account_id: "REPLACE_ACCOUNT_ID"
+    aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
+    aws_region: us-east-1
+    tagging_environment: PROD

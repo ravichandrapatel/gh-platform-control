@@ -1,5 +1,7 @@
-bucket         = "gh-platform-tfstate-ACCOUNT"
-key            = "sandbox/s3-bucket.tfstate"
-region         = "us-east-1"
-encrypt        = true
-# dynamodb_table = "gh-platform-tflock"  # optional if not using S3 native lock
+# Example remote state for a workload stack (do not commit secrets).
+# Prefer per-account buckets; key layout: stacks/<stack_id>/terraform.tfstate
+bucket       = "tfstate-ACCOUNT_ID-dev"
+key          = "stacks/example-stack/terraform.tfstate"
+region       = "us-east-1"
+encrypt      = true
+use_lockfile = true

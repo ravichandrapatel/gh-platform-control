@@ -1,0 +1,79 @@
+# FILE_NAME: status-sync.yml
+# DESCRIPTION: Update IssueOps issue labels + Deployment from workload callbacks.
+# VERSION: 0.1.0
+
+name: status-sync
+
+on:
+  repository_dispatch:
+    types: [issueops_status]
+
+permissions:
+  contents: read
+  issues: write
+  deployments: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply status
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.client_payload.issue_number }}
+          STATE: ${{ github.event.client_payload.state }}
+          DEP_ID: ${{ github.event.client_payload.deployment_id }}
+          LOG_URL: ${{ github.event.client_payload.log_url }}
+          MESSAGE: ${{ github.event.client_payload.message }}
+        run: |
+          set -euo pipefail
+          : "${ISSUE:?missing issue_number in client_payload}"
+          : "${STATE:?missing state in client_payload}"
+
+          case "${STATE}" in
+            plan_ok)
+              label="status:plan-ok"
+              dep_state="in_progress"
+              ;;
+            plan_failed)
+              label="status:plan-failed"
+              dep_state="failure"
+              ;;
+            applied)
+              label="status:applied"
+              dep_state="success"
+              ;;
+            apply_failed)
+              label="status:apply-failed"
+              dep_state="failure"
+              ;;
+            *)
+              echo "::error::unknown state ${STATE}"
+              exit 1
+              ;;
+          esac
+
+          for stale in status:pending-validation status:pr-open status:plan-ok status:plan-failed status:applied status:apply-failed status:validation-failed; do
+            gh issue edit "${ISSUE}" --repo "${{ github.repository }}" --remove-label "${stale}" 2>/dev/null || true
+          done
+          gh issue edit "${ISSUE}" --repo "${{ github.repository }}" --add-label "${label}"
+
+          body="### Workload status: \`${STATE}\`"
+          if [[ -n "${MESSAGE:-}" ]]; then
+            body="${body}"$'\n\n'"${MESSAGE}"
+          fi
+          if [[ -n "${LOG_URL:-}" ]]; then
+            body="${body}"$'\n\n'"Log: ${LOG_URL}"
+          fi
+          gh issue comment "${ISSUE}" --repo "${{ github.repository }}" --body "${body}"
+
+          if [[ -n "${DEP_ID:-}" ]]; then
+            args=(--method POST "/repos/${{ github.repository }}/deployments/${DEP_ID}/statuses" -f state="${dep_state}")
+            if [[ -n "${LOG_URL:-}" ]]; then
+              args+=(-f log_url="${LOG_URL}" -f environment_url="${LOG_URL}")
+            fi
+            if [[ -n "${MESSAGE:-}" ]]; then
+              args+=(-f description="${MESSAGE}")
+            fi
+            gh api "${args[@]}"
+          fi

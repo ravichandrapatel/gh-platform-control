@@ -1,0 +1,6 @@
+# Mirror of the `dev` row from gh-platform-control config/environments.yaml
+name: dev
+github_environment: dev
+aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-dev
+aws_region: us-east-1
+control_repository: OWNER/gh-platform-control
