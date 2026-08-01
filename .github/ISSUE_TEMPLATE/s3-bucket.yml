@@ -1,13 +1,19 @@
 name: Provision S3 bucket
-description: Request an S3 bucket in a target environment (IssueOps → workload PR).
+description: Request an S3 bucket (authorized operators only — public demo is gated).
 title: "[provision][s3-bucket] "
-labels: ["issueops", "product:s3-bucket", "status:pending-validation"]
+# Do NOT auto-apply issueops/product labels — that would let any public user
+# trigger provision. Maintainers (or authorized authors with write) add:
+#   issueops, product:s3-bucket, status:pending-validation
+labels: []
 body:
   - type: markdown
     attributes:
       value: |
-        Submit this form to open a GitOps PR on the environment workload repo.
-        Control validates inputs, generates stack code, and tracks Deployment status.
+        **Public demo gate:** opening this form does **not** start provisioning.
+        An authorized operator must label the issue with `issueops` + `product:s3-bucket`
+        (and be listed in `config/operators.yaml` or have write access on this repo).
+
+        Flow after authorization: validate → codegen → GitOps PR on the workload repo.
   - type: dropdown
     id: environment
     attributes:

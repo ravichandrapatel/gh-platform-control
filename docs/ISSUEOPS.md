@@ -5,9 +5,23 @@ Primary self-service path for this control plane.
 ## Request
 
 1. **Issues → New issue → Provision S3 bucket** (add products by cloning the form + catalog entry + template).
-2. Workflow `issue-provision` runs when labels include `issueops` and `product:<id>`.
-3. On success: workload PR link, tracking Deployment id (`issueops-<env>`), label `status:pr-open`.
-4. On failure: label `status:validation-failed` + run link.
+2. An **authorized operator** labels the issue `issueops` + `product:<id>` (+ `status:pending-validation`).
+   The public form does **not** auto-apply those labels (prevents drive-by provision on a public demo).
+3. Workflow `issue-provision` runs only with those labels **and** passes author authz
+   (`config/operators.yaml` and/or repo write collaborator).
+4. On success: workload PR link, tracking Deployment id (`issueops-<env>`), label `status:pr-open`.
+5. On failure: label `status:validation-failed` + run link.
+
+## Public demo security
+
+| Control | Purpose |
+| --- | --- |
+| No auto `issueops` labels on the Issue Form | Random public users cannot trigger the workflow by opening a form |
+| `config/operators.yaml` + collaborator write check | Issue **author** must be allowlisted or have write/maintain/admin |
+| Private workload repos (`infra-*`) | Generated PRs land in private GitOps repos |
+| GitHub App scoped to workload repos | Control never applies to AWS; App cannot be invoked without authz step |
+
+Still treat public control as demo-only: rotate App credentials if leaked; keep AWS roles on private workloads.
 
 ### Control Environments vs workload Environments
 

@@ -1,0 +1,8 @@
+# Who may run IssueOps on this control plane (public-demo hardening).
+# Matching is case-insensitive GitHub login.
+#
+# Defense in depth with collaborator check in scripts/authorize_requester.py:
+# author must be listed here AND/OR have write|maintain|admin on this repo.
+
+operators:
+  - ravichandrapatel

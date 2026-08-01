@@ -1,12 +1,12 @@
 # FILE_NAME: issue-provision.yml
 # DESCRIPTION: IssueOps — validate form, render stack, open workload PR, track Deployment.
-# VERSION: 0.3.0
+# VERSION: 0.4.0
 
 name: issue-provision
 
 on:
   issues:
-    types: [opened, edited, reopened]
+    types: [opened, edited, reopened, labeled]
 
 permissions:
   contents: read
@@ -15,6 +15,8 @@ permissions:
 
 jobs:
   provision:
+    # Labels are NOT auto-applied by the public Issue Form (see ISSUE_TEMPLATE).
+    # Workflow runs only after issueops + product:* are present (manual label).
     if: >-
       contains(github.event.issue.labels.*.name, 'issueops') &&
       contains(github.event.issue.labels.*.name, 'product:s3-bucket')
@@ -22,6 +24,21 @@ jobs:
     steps:
       - name: Checkout control
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Authorize requester
+        id: authz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.event.issue.user.login }}
+          REPOSITORY: ${{ github.repository }}
+          PYTHONPATH: scripts
+        run: |
+          set -euo pipefail
+          python3 scripts/authorize_requester.py \
+            --root . \
+            --actor "${ACTOR}" \
+            --repository "${REPOSITORY}" \
+            --mode operators_or_write
 
       - name: Validate control config
         id: cfg
@@ -209,6 +226,7 @@ jobs:
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHZ: ${{ steps.authz.outcome }}
           CFG: ${{ steps.cfg.outcome }}
           PARSE: ${{ steps.parse.outcome }}
           VALIDATE: ${{ steps.validate.outcome }}
@@ -221,7 +239,10 @@ jobs:
           set -euo pipefail
           label="status:provision-failed"
           reason="provision"
-          if [[ "${CFG}" == "failure" || "${APP}" == "failure" ]]; then
+          if [[ "${AUTHZ}" == "failure" ]]; then
+            label="status:validation-failed"
+            reason="authorization (issue author not an operator)"
+          elif [[ "${CFG}" == "failure" || "${APP}" == "failure" ]]; then
             label="status:config-error"
             reason="config (pins/App credentials/token)"
           elif [[ "${PARSE}" == "failure" || "${VALIDATE}" == "failure" || "${RENDER}" == "failure" || "${DUP}" == "failure" ]]; then
@@ -231,6 +252,7 @@ jobs:
             label="status:provision-failed"
             reason="provision (PR/deployment)"
           fi
+
 
           gh issue edit "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \

@@ -2,7 +2,7 @@
 
 **IssueOps control plane** for a zero-cost, GitHub-only internal developer platform (IDP).
 
-- Users submit **Issue Forms** to request resources.
+- Authorized operators submit **Issue Forms** to request resources (public demos are gated).
 - Control **validates**, **generates** OpenTofu stack roots, and **opens PRs** on per-env workload repos (`infra-dev` / `infra-prod`).
 - Workloads run pinned **`tofu-pipeline`** (plan/apply) in their own AWS account via OIDC.
 - Control **updates issue + Deployment status** from workload callbacks.
@@ -23,7 +23,8 @@ Does **not** vendor module/action source or apply infrastructure itself.
 2. Create workload repos from [`examples/infra-dev/`](examples/infra-dev/) and [`examples/infra-prod/`](examples/infra-prod/).
 3. Install the control GitHub App ([docs/GITHUB_APP.md](docs/GITHUB_APP.md)).
 4. Wire OIDC on **workload** repos ([docs/OIDC_AND_BACKEND.md](docs/OIDC_AND_BACKEND.md)).
-5. Open **Issues → New → Provision S3 bucket**.
+5. Add yourself to [`config/operators.yaml`](config/operators.yaml).
+6. Open **Issues → New → Provision S3 bucket**, then label `issueops` + `product:s3-bucket`.
 
 ## Docs
 
@@ -31,6 +32,7 @@ Does **not** vendor module/action source or apply infrastructure itself.
 | --- | --- |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Control vs workload split |
 | [docs/ISSUEOPS.md](docs/ISSUEOPS.md) | Forms, labels, validation |
+| [docs/PUBLIC_DEMO.md](docs/PUBLIC_DEMO.md) | Public-repo IssueOps hardening |
 | [docs/WORKLOAD_REPOS.md](docs/WORKLOAD_REPOS.md) | Env workload layout |
 | [docs/GITHUB_APP.md](docs/GITHUB_APP.md) | Cross-repo PR bot |
 | [docs/OIDC_AND_BACKEND.md](docs/OIDC_AND_BACKEND.md) | AWS auth + state |
