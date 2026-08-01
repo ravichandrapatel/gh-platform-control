@@ -56,16 +56,17 @@ cd "${work}/repo"
 git config user.name "gh-platform-control[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-git fetch origin "${base_branch}"
+# Shallow clone: fetch refs explicitly (origin/<branch> is not always created).
+git fetch --depth 1 origin "${base_branch}"
 if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null 2>&1; then
-  git fetch origin "${branch}"
+  git fetch --depth 1 origin "refs/heads/${branch}:refs/remotes/origin/${branch}"
   git checkout -B "${branch}" "origin/${branch}"
 else
   git checkout -B "${branch}" "origin/${base_branch}"
 fi
 
 # Natural-key stack already on main → refuse (deployed / merged claim).
-if git show "origin/${base_branch}:${stack_path}/main.tf" >/dev/null 2>&1; then
+if git cat-file -e "origin/${base_branch}:${stack_path}/main.tf" 2>/dev/null; then
   echo "ERROR: stack already exists on ${base_branch}: ${stack_path}" >&2
   exit 1
 fi
