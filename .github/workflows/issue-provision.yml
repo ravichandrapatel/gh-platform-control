@@ -133,13 +133,16 @@ jobs:
           )"
           dep_id="$(printf '%s' "${resp}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
           echo "id=${dep_id}" >> "${GITHUB_OUTPUT}"
-          gh api \
-            --method POST \
-            "/repos/${{ github.repository }}/deployments/${dep_id}/statuses" \
-            -f state="pending" \
-            -f description="Workload PR opened" \
-            -f environment_url="${PR_URL}" \
-            -f log_url="${PR_URL}"
+          status_args=(
+            --method POST
+            "/repos/${{ github.repository }}/deployments/${dep_id}/statuses"
+            -f state="pending"
+            -f description="Workload PR opened"
+          )
+          if [[ "${PR_URL}" == https://* ]]; then
+            status_args+=(-f environment_url="${PR_URL}" -f log_url="${PR_URL}")
+          fi
+          gh api "${status_args[@]}"
 
       - name: Update issue
         id: update-issue

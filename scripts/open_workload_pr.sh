@@ -28,9 +28,10 @@ trap cleanup EXIT
 export GH_TOKEN="${TOKEN}"
 export GIT_TERMINAL_PROMPT=0
 
-# Reuse an existing open PR for this head if present (REST; App tokens often lack GraphQL).
+# Reuse an existing open PR for this head if present (REST).
+# Important: on 403, `gh api` may still print JSON to stdout — only accept https URLs.
 existing_pr="$(gh api "repos/${workload_repository}/pulls?state=open&head=${owner}:${branch}" --jq '.[0].html_url' 2>/dev/null || true)"
-if [[ -n "${existing_pr}" && "${existing_pr}" != "null" ]]; then
+if [[ "${existing_pr}" == https://* ]]; then
   echo "PR_URL=${existing_pr}"
   echo "${existing_pr}" > "${ROOT}/.pr-url"
   echo "${branch}" > "${ROOT}/.pr-branch"
@@ -86,12 +87,14 @@ body="$(cat <<EOF
 EOF
 )"
 
-if ! pr_url="$(gh api --method POST "repos/${workload_repository}/pulls" \
+pr_url="$(gh api --method POST "repos/${workload_repository}/pulls" \
   -f title="${title}" \
   -f head="${branch}" \
   -f base="${base_branch}" \
   -f body="${body}" \
-  --jq .html_url 2>/tmp/pr-create.err)"; then
+  --jq .html_url 2>/tmp/pr-create.err || true)"
+
+if [[ "${pr_url}" != https://* ]]; then
   echo "ERROR: failed to open PR. Ensure the GitHub App has Pull requests: Read and write on ${workload_repository}." >&2
   echo "Branch pushed: https://github.com/${workload_repository}/compare/${base_branch}...${branch}?expand=1" >&2
   cat /tmp/pr-create.err >&2 || true
