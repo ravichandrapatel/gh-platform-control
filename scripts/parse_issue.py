@@ -28,6 +28,9 @@ def slug_key(label: str) -> str:
 
 
 def parse_issue_body(body: str) -> dict[str, str]:
+    # Drop HTML comments (e.g. <!-- retest ... -->) so they never join field values.
+    body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
+
     fields: dict[str, str] = {}
     current: str | None = None
     buf: list[str] = []
@@ -39,6 +42,9 @@ def parse_issue_body(body: str) -> dict[str, str]:
         value = "\n".join(buf).strip()
         if value in ("_No response_", "None"):
             value = ""
+        # Issue Forms are single-line scalars; keep the first non-empty line only.
+        if value:
+            value = next((ln.strip() for ln in value.splitlines() if ln.strip()), "")
         fields[current] = value
         current = None
         buf = []
