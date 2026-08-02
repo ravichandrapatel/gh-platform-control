@@ -99,6 +99,25 @@ See [PUBLIC_DEMO.md](PUBLIC_DEMO.md).
 | Closed unmerged PR | Name free again |
 | Exists only in AWS, not in git | Not checked by control (Git is SoT) |
 
+### 3.4 Drift detection (day-2)
+
+Workload cron (`drift.yml`) calls pinned **`drift-reconcile`** — control never plans or applies.
+
+| Env | Report issue | Stamp PR (`drift/reconcile`) |
+| --- | --- | --- |
+| `infra-dev` | Yes | Yes — **create/update only** |
+| `infra-prod` | Yes | **No** (report only) |
+
+| Plan class | What to do |
+| --- | --- |
+| Safe (create/update) | Dev: review/merge stamp PR → Environment-gated apply. Prod: open a human PR. |
+| Destroy (any delete) | **Never** auto-PR. Triage ClickOps vs Git; explicit workload PR if destroy is intentional. |
+| Clean | Drift issue / stale stamp PR closed |
+
+`tofu-pipeline` also runs Conftest **deny destroy** on any PR whose head branch starts with `drift/`.
+
+Docs: [drift-reconcile](https://github.com/ravichandrapatel/gh-platform-actions/blob/main/docs/workflows/drift-reconcile.md).
+
 ---
 
 ## 4. Day labels cheat sheet

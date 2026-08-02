@@ -8,8 +8,8 @@ Zero-cost, GitHub-only IDP control plane. **One** control repo for intake;
 | Repo | Role | Release unit |
 | --- | --- | --- |
 | `gh-platform-control` | IssueOps intake, catalog, pins, codegen, status | Config + workflows on `main` |
-| `infra-<env>` (workload) | GitOps stacks + `tofu-pipeline` CI | Protected `main` per account |
-| `gh-platform-actions` | Reusable `tofu-pipeline` + policies | Commit SHA |
+| `infra-<env>` (workload) | GitOps stacks + `tofu-pipeline` + `drift-reconcile` | Protected `main` per account |
+| `gh-platform-actions` | Reusable `tofu-pipeline`, `drift-reconcile`, policies | Commit SHA |
 | `gh-platform-modules` | OpenTofu modules | Annotated SemVer tags (`s3/vX.Y.Z`) |
 
 ## Flow
@@ -33,6 +33,9 @@ Issue Form → validate → render template → GitHub App PR → workload CI
    (status only — not an AWS deploy; do not put protection rules here).
 6. Workload CI calls pinned `tofu-pipeline` (plan on PR; apply after merge + Environment gate).
 7. Workload notifies control via `repository_dispatch`; control updates the issue + Deployment.
+8. Day-2: workload cron runs pinned `drift-reconcile` — Drift Report issue; **dev** may open a
+   create/update-only stamp PR; **prod** is report-only; any destroy stays human-triaged.
+   Control never plans or applies for drift.
 
 Control **never** assumes AWS roles for apply. OIDC trust and real GitHub Environments
 (`dev` / `prod`) live on the **workload** repos (`infra-<env>`), not on control.

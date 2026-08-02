@@ -7,9 +7,10 @@ Copy this tree to `OWNER/infra-dev`, then replace placeholders and wire OIDC.
 ## Layout
 
 ```text
-stacks/                     # IssueOps-generated OpenTofu roots
-.github/workflows/tofu.yml  # Calls pinned tofu-pipeline
-config/environment.yaml     # Role / region for this env
+stacks/                      # IssueOps-generated OpenTofu roots
+.github/workflows/tofu.yml   # Calls pinned tofu-pipeline
+.github/workflows/drift.yml  # Drift report + stamp PR (create/update only)
+config/environment.yaml      # Role / region for this env
 ```
 
 ## Setup
@@ -20,6 +21,15 @@ config/environment.yaml     # Role / region for this env
 4. OIDC trust: `repo:OWNER/infra-dev:environment:dev` → `gh-platform-dev` role.
 5. Confirm control `config/environments.yaml` has the `dev` row.
 6. Install the control GitHub App on this repo (contents + pull requests write).
+7. Copy `drift.yml`; pin the same actions SHA as `tofu.yml`. Ensure OIDC trust allows
+   schedule/dispatch on `main` (detect has no Environment gate). Dev sets
+   `open_reconcile_pr: true` — destroy plans stay report-only.
+
+## Drift
+
+Weekday cron opens/updates **Infrastructure Drift Report**. Safe (create/update) drift also
+opens `drift/reconcile` stamp PR → normal plan → Environment-gated apply. Any destroy →
+issue only. See [drift-reconcile](https://github.com/ravichandrapatel/gh-platform-actions/blob/main/docs/workflows/drift-reconcile.md).
 
 ## Status callback
 
