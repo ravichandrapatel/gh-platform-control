@@ -152,4 +152,7 @@
 
 | Pass | Date | Notes |
 | --- | --- | --- |
-| 1 | | |
+| 1 | 2026-08-09 | Local T1–T3/T8 green. CI PR#16/#20 green. Twin-run push race found → fixed concurrency + attach (#20). Restart: T6.1 skip, T6.3 PR#11 success (single success run), T6.4 dup fail+attach, T6.7 bad product validation-failed, T7.1 skip, T7.2 existing `dev` validation-failed, T7.6 missing `MODULES_GIT_TOKEN` → config-error (no repo). Browser UI T5 blocked (IDE browser not signed into GitHub); templates/workflows verified via API. |
+| | | **Blocked until secret set:** T7.4 EnvOps happy path needs control secret `MODULES_GIT_TOKEN`. |
+| | | **Skipped (no live ruleset proof):** T6.9 DIY new stack on infra-dev. |
+| | | **Skipped (needs alt user):** T6.2 unauthorized author. |
