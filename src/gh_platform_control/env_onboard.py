@@ -361,7 +361,7 @@ def onboard_environment(
         if "protect-main" in names:
             print("WARN: ruleset protect-main already exists; leaving as-is")
         else:
-            _run(
+            rs = _run(
                 [
                     "gh",
                     "api",
@@ -372,9 +372,17 @@ def onboard_environment(
                     str(ruleset_json),
                 ],
                 env=env,
+                check=False,
                 capture=True,
             )
-            print("OK: ruleset protect-main applied")
+            if rs.returncode != 0:
+                detail = (rs.stderr or rs.stdout or "").strip()
+                print(
+                    "WARN: ruleset protect-main not applied "
+                    f"(private personal repos need GitHub Pro). detail={detail[:300]}"
+                )
+            else:
+                print("OK: ruleset protect-main applied")
 
         (root / ".workload-repo").write_text(workload_repository + "\n", encoding="utf-8")
         (root / ".workload-url").write_text(
