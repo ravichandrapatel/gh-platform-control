@@ -16,6 +16,11 @@ permissions:
 env:
   PYTHONPATH: src
 
+# opened+labeled (or double delivery) can race the same natural-key branch.
+concurrency:
+  group: issue-provision-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   provision:
     # Labels are NOT auto-applied by the public Issue Form (see ISSUE_TEMPLATE).
