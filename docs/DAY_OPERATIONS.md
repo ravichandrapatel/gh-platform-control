@@ -361,6 +361,18 @@ MVP: **one env = one AWS account = one workload repo**.
 - Do **not** run OpenTofu inside `gh-platform-control`.
 - Emergency infra change: PR directly on `infra-<env>` (same pipeline gates).
 - Compromised App key: rotate App private key; update `CONTROL_APP_PRIVATE_KEY`; revoke old key in App settings.
+- Compromised operator: remove login from `config/operators.yaml`; revoke sessions; rotate App/user tokens if exposed.
+- Bad module tag: pin rollback in catalog + workload `ref=`; yank/deprecate the tag in modules.
+- Emergency freeze: stop labeling `issueops` / `envops` (remove operators or temporarily disable workflows on `main`).
+
+## 13.1 GitHub Actions outage
+
+When Actions is down or queues stall:
+
+1. **Do not** bypass with local `tofu apply` against prod accounts.
+2. Pause intake: avoid new `issueops` / `envops` labels; comment on open issues that automation is paused.
+3. When Actions recovers: re-label or re-run failed workflows; confirm natural-key claims (`status:pr-open`) before retrying duplicates.
+4. Prefer workload Environment gates still hold once runs resume — do not widen OIDC trust to recover.
 
 ---
 
