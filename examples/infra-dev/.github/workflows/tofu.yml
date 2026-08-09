@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: ravichandrapatel/gh-platform-actions/actions/security/guard-new-stacks@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
+      - uses: ravichandrapatel/gh-platform-actions/actions/security/guard-new-stacks@952412b3bffed728a9e07cd42cca705eda0a621f
         with:
           base_ref: origin/${{ github.base_ref }}
           head_ref_name: ${{ github.head_ref }}
@@ -67,7 +67,7 @@ jobs:
       contents: read
       id-token: write
       actions: write
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@952412b3bffed728a9e07cd42cca705eda0a621f
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: dev
@@ -90,7 +90,7 @@ jobs:
       contents: read
       id-token: write
       actions: write
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@952412b3bffed728a9e07cd42cca705eda0a621f
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: dev
