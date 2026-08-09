@@ -1,6 +1,6 @@
 # FILE_NAME: validate_env.py
 # DESCRIPTION: Validate env-onboard Issue Form fields; resolve template + registry row.
-# VERSION: 0.2.0
+# VERSION: 0.3.0
 from __future__ import annotations
 
 import argparse
@@ -73,10 +73,13 @@ def validate_env_request(
     pins = load_yaml(root / "config" / "pins.yaml")
     actions_repo = ((pins.get("actions") or {}).get("repository") or "").strip()
     actions_ref = ((pins.get("actions") or {}).get("ref") or "").strip()
+    modules_repo = ((pins.get("modules") or {}).get("repository") or "").strip()
     if not actions_repo or not actions_ref or len(actions_ref) != 40:
         fail("config/pins.yaml actions.repository/ref missing or ref not 40-char SHA")
     if not re.fullmatch(r"[0-9a-f]{40}", actions_ref):
         fail("config/pins.yaml actions.ref must be a lowercase 40-char hex SHA")
+    if not modules_repo or "/" not in modules_repo:
+        fail("config/pins.yaml modules.repository missing or not owner/name")
 
     owner = control_repo.split("/", 1)[0]
     workload_repository = f"{owner}/infra-{slug}"
@@ -104,6 +107,7 @@ def validate_env_request(
         "aws_region": region,
         "actions_repository": actions_repo,
         "actions_ref": actions_ref,
+        "modules_repository": modules_repo,
         "control_repo": control_repo,
         "issue_number": str(issue_number),
         "branch": f"envops/{slug}",

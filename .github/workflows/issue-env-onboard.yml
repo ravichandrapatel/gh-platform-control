@@ -92,12 +92,11 @@ jobs:
             --resolved-json /tmp/env-resolved.json \
             --out-dir /tmp/infra-scaffold
 
-      - name: Require App credentials + modules token
+      - name: Require App credentials
         id: require-creds
         env:
           CLIENT_ID: ${{ vars.CONTROL_CLIENT_ID }}
           PRIVATE_KEY_PRESENT: ${{ secrets.CONTROL_APP_PRIVATE_KEY != '' }}
-          MODULES_PRESENT: ${{ secrets.MODULES_GIT_TOKEN != '' }}
         run: |
           set -euo pipefail
           if [[ -z "${CLIENT_ID}" ]]; then
@@ -108,11 +107,7 @@ jobs:
             echo "::error::CONTROL_APP_PRIVATE_KEY repository secret is missing on control."
             exit 1
           fi
-          if [[ "${MODULES_PRESENT}" != "true" ]]; then
-            echo "::error::MODULES_GIT_TOKEN repository secret is missing on control (copied to new infra-* repos)."
-            exit 1
-          fi
-          echo "OK: credentials present"
+          echo "OK: App credentials present"
 
       - name: Mint GitHub App token
         id: app-token
@@ -122,21 +117,30 @@ jobs:
           private-key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           # Omit repositories: need org/user installation scope to create repos
-          # and to open the control registry PR. Prefer App install on All repos.
+          # and to open the control registry PR. Prefer App install on All repos
+          # (must include gh-platform-modules for workload module mint).
 
       - name: Onboard workload repository
         id: onboard
         env:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          CONTROL_CLIENT_ID: ${{ vars.CONTROL_CLIENT_ID }}
+          CONTROL_APP_PRIVATE_KEY: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
           MODULES_GIT_TOKEN: ${{ secrets.MODULES_GIT_TOKEN }}
         run: |
           set -euo pipefail
-          python3 -m gh_platform_control onboard-environment \
-            --resolved-json /tmp/env-resolved.json \
-            --scaffold-dir /tmp/infra-scaffold \
-            --token "${APP_TOKEN}" \
-            --modules-token "${MODULES_GIT_TOKEN}" \
+          args=(
+            --resolved-json /tmp/env-resolved.json
+            --scaffold-dir /tmp/infra-scaffold
+            --token "${APP_TOKEN}"
+            --app-client-id "${CONTROL_CLIENT_ID}"
+            --app-private-key "${CONTROL_APP_PRIVATE_KEY}"
             --ruleset-json docs/ruleset-workload.json
+          )
+          if [[ -n "${MODULES_GIT_TOKEN:-}" ]]; then
+            args+=(--modules-token "${MODULES_GIT_TOKEN}")
+          fi
+          python3 -m gh_platform_control onboard-environment "${args[@]}"
           echo "url=$(cat .workload-url)" >> "${GITHUB_OUTPUT}"
 
       - name: Open control registry PR
@@ -181,7 +185,7 @@ jobs:
           #### Done by automation
           - Private repo + starter from \`examples/infra-*\`
           - GitHub Environment \`${ENV_NAME}\` + repo/env variables
-          - Secret \`MODULES_GIT_TOKEN\` copied from control
+          - App mint vars/secret: \`CONTROL_CLIENT_ID\`, \`MODULES_GIT_REPOSITORY\`, \`CONTROL_APP_PRIVATE_KEY\`
           - Ruleset \`protect-main\` (\`guard-new-stacks\`, **no admin bypass**)
 
           #### Still manual (AWS)
@@ -214,7 +218,7 @@ jobs:
             reason="authorization"
           elif [[ "${CFG}" == "failure" || "${CREDS}" == "failure" || "${APP}" == "failure" ]]; then
             label="status:config-error"
-            reason="config (pins/App/MODULES_GIT_TOKEN)"
+            reason="config (pins/App credentials)"
           elif [[ "${PARSE}" == "failure" || "${VALIDATE}" == "failure" || "${SCAFFOLD}" == "failure" ]]; then
             label="status:validation-failed"
             reason="validation (form/registry/scaffold)"
