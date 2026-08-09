@@ -268,14 +268,9 @@ def onboard_environment(
         _run(["git", "commit", "-m", commit_msg], cwd=repo_dir, env=env)
         _run(["git", "push", "-u", "origin", "main"], cwd=repo_dir, env=env)
 
-        env_body = json.dumps(
-            {
-                "wait_timer": 0,
-                "prevent_self_review": False,
-                "reviewers": [],
-                "deployment_branch_policy": None,
-            }
-        )
+        # Free personal accounts reject protection-rule fields (HTTP 422). Create
+        # a bare Environment; reviewers can be added later on paid/org plans.
+        env_body = "{}"
         _run(
             [
                 "gh",
