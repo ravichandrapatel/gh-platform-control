@@ -271,7 +271,48 @@ def open_workload_pr(
                 f"Natural-key: {natural_key}\n"
             )
             _run(["git", "commit", "-m", msg], cwd=repo_dir, env=env)
-            _run(["git", "push", "-u", "origin", branch], cwd=repo_dir, env=env)
+            push = _run(
+                ["git", "push", "-u", "origin", branch],
+                cwd=repo_dir,
+                env=env,
+                check=False,
+                capture=True,
+            )
+            if push.returncode != 0:
+                # Race: peer runner created the same natural-key branch first.
+                race = _gh_json(
+                    [
+                        "gh",
+                        "api",
+                        f"repos/{workload_repository}/pulls?state=open&head={owner}:{branch}",
+                    ],
+                    env,
+                )
+                race_pr = ""
+                race_body = ""
+                if isinstance(race, list) and race and isinstance(race[0], dict):
+                    race_pr = str(race[0].get("html_url") or "")
+                    race_body = str(race[0].get("body") or "")
+                if race_pr.startswith("https://") and pr_owned_by_this_issue(
+                    race_body, control_repo, issue_number
+                ):
+                    print(
+                        f"ATTACH: push raced; keeping same-issue PR {race_pr}",
+                        flush=True,
+                    )
+                    write_pr_artifacts(
+                        root,
+                        url=race_pr,
+                        branch=branch,
+                        workload_repository=workload_repository,
+                        mode="attached",
+                    )
+                    return race_pr
+                if push.stderr:
+                    print(push.stderr, end="", flush=True)
+                if push.stdout:
+                    print(push.stdout, end="", flush=True)
+                fail(f"git push failed for branch {branch}")
 
         if mode == "attached" and existing_pr.startswith("https://"):
             write_pr_artifacts(

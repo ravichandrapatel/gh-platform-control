@@ -16,6 +16,10 @@ permissions:
 env:
   PYTHONPATH: src
 
+concurrency:
+  group: issue-env-onboard-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   onboard:
     if: contains(github.event.issue.labels.*.name, 'envops')
