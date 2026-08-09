@@ -1,0 +1,13 @@
+name: ARC lab — containerMode none
+on:
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: arc-runners-default
+    steps:
+      - name: Prove default runnerset
+        run: |
+          set -euo pipefail
+          echo "runner=$(hostname)"
+          echo "mode=containerMode-none"
+          uname -a
