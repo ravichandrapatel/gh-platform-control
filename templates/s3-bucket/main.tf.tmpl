@@ -17,14 +17,14 @@ provider "aws" {
 }
 
 module "tags" {
-  source = "git::https://github.com/{{MODULES_REPOSITORY}}.git//tagging?ref={{TAGGING_MODULE_REF}}"
+  source = "git::https://github.com/{{MODULES_REPOSITORY}}.git?ref={{TAGGING_MODULE_REF}}"
 
   environment = "{{TAGGING_ENVIRONMENT}}"
   project     = "{{PROJECT}}"
 }
 
 module "bucket" {
-  source = "git::https://github.com/{{MODULES_REPOSITORY}}.git//s3?ref={{MODULE_REF}}"
+  source = "git::https://github.com/{{MODULES_REPOSITORY}}.git?ref={{MODULE_REF}}"
 
   bucket_name             = "{{BUCKET_NAME}}"
   enable_versioning       = {{ENABLE_VERSIONING}}

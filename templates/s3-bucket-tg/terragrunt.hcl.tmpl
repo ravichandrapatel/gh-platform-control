@@ -9,7 +9,7 @@ include "root" {
 }
 
 terraform {
-  source = "git::https://github.com/{{MODULES_REPOSITORY}}.git//s3?ref={{MODULE_REF}}"
+  source = "git::https://github.com/{{MODULES_REPOSITORY}}.git?ref={{MODULE_REF}}"
 }
 
 inputs = {
