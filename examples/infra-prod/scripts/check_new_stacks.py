@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 # FILE_NAME: check_new_stacks.py
-# DESCRIPTION: Fail PRs that add new stacks/* dirs unless the branch is issueops/*.
-# VERSION: 0.2.0
-# No owner/admin escape hatch — new stacks only via control IssueOps App PRs.
+# DESCRIPTION: Fail PRs that add new stacks/* unless they are real control IssueOps.
+# VERSION: 0.3.0
+# No owner/admin escape hatch — new stacks only via control GitHub App IssueOps PRs.
 from __future__ import annotations
 
 import argparse
+import json
+import re
 import subprocess
 import sys
+from pathlib import Path
+
+BRANCH_RE = re.compile(r"^issueops/([a-z0-9][a-z0-9-]{0,127})$")
+ISSUE_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$")
 
 
 def fail(msg: str) -> None:
@@ -28,6 +34,44 @@ def list_stack_dirs(ref: str) -> set[str]:
     return {ln.strip() for ln in (proc.stdout or "").splitlines() if ln.strip()}
 
 
+def is_github_app_actor(actor: str) -> bool:
+    # Humans cannot register logins containing '[' — App actors end with [bot].
+    a = (actor or "").strip()
+    return a.endswith("[bot]")
+
+
+def validate_metadata(stack_name: str) -> None:
+    path = Path("stacks") / stack_name / "stack-metadata.json"
+    if not path.is_file():
+        fail(
+            f"new stack '{stack_name}' missing stack-metadata.json "
+            "(IssueOps renders this; humans must not DIY new stacks)"
+        )
+    try:
+        meta = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        fail(f"stack-metadata.json for '{stack_name}' is not valid JSON: {e}")
+    if not isinstance(meta, dict):
+        fail(f"stack-metadata.json for '{stack_name}' must be an object")
+
+    stack_id = str(meta.get("stack_id") or "").strip()
+    if stack_id != stack_name:
+        fail(
+            f"stack-metadata.json stack_id={stack_id!r} must equal directory {stack_name!r}"
+        )
+
+    issue = str(meta.get("issue") or "").strip()
+    if not ISSUE_RE.fullmatch(issue):
+        fail(
+            f"stack-metadata.json issue={issue!r} must look like "
+            "owner/control-repo#123 (control IssueOps provenance)"
+        )
+
+    for key in ("product", "natural_key", "environment", "runner"):
+        if not str(meta.get(key) or "").strip():
+            fail(f"stack-metadata.json missing required field {key!r}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -40,6 +84,11 @@ def main() -> int:
         default="",
         help="PR head branch name (github.head_ref)",
     )
+    parser.add_argument(
+        "--actor",
+        default="",
+        help="github.actor — must be a GitHub App bot for new stacks",
+    )
     args = parser.parse_args()
 
     base_stacks = list_stack_dirs(args.base_ref)
@@ -51,17 +100,36 @@ def main() -> int:
         return 0
 
     head = (args.head_ref_name or "").strip()
-    if head.startswith("issueops/"):
-        print(f"OK: new stacks allowed via IssueOps branch {head}: {', '.join(new_stacks)}")
-        return 0
+    m = BRANCH_RE.fullmatch(head)
+    if not m:
+        fail(
+            "new stack directories are forbidden for humans (including repo owners/admins). "
+            "Only control IssueOps may create stacks "
+            "(branch must match issueops/<stack_id>). "
+            f"Refused branch={head!r} stacks={', '.join(new_stacks)}."
+        )
 
-    fail(
-        "new stack directories are forbidden for humans (including repo owners/admins). "
-        "Only control IssueOps may create stacks (PR branch must be issueops/<stack_id>). "
-        f"Refused: {', '.join(new_stacks)}. "
-        "Edit existing stacks/** for day-2 changes, or open a control Issue Form to provision new ones."
+    stack_id = m.group(1)
+    if new_stacks != [stack_id]:
+        fail(
+            "IssueOps PRs must add exactly one new stack matching the branch suffix. "
+            f"branch stack_id={stack_id!r} new_stacks={new_stacks}"
+        )
+
+    actor = (args.actor or "").strip()
+    if not is_github_app_actor(actor):
+        fail(
+            "new stacks require a GitHub App PR author (login ending in [bot]). "
+            f"Human actor={actor!r} cannot open issueops/* DIY stacks. "
+            "Use the control Issue Form."
+        )
+
+    validate_metadata(stack_id)
+    print(
+        f"OK: IssueOps new stack allowed "
+        f"branch={head} actor={actor} stack={stack_id}"
     )
-    return 1
+    return 0
 
 
 if __name__ == "__main__":

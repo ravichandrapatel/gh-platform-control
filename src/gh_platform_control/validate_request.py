@@ -1,6 +1,6 @@
 # FILE_NAME: validate_request.py
 # DESCRIPTION: Validate parsed Issue Form JSON against catalog + environments.
-# VERSION: 0.4.0
+# VERSION: 0.4.1
 from __future__ import annotations
 
 import argparse
@@ -70,7 +70,9 @@ def validate_request(
         fail("request JSON must be an object")
 
     body_product = str(req.get("product", "")).strip()
-    if body_product and body_product != product_id:
+    if not body_product:
+        fail("product missing from request body (Issue Form Product is required)")
+    if body_product != product_id:
         fail(f"product mismatch: --product={product_id!r} vs body={body_product!r}")
 
     product = load_product(root / "config/catalog/products", product_id)
