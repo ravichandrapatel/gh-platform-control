@@ -19,16 +19,22 @@ body:
         and `config/environments.yaml`. Flow: validate → codegen → GitOps PR.
 
         Catalog products:
+        - `ecs-cluster` (ECS Cluster, runner=tofu) — Provision an ECS cluster via golden-path module.
         - `s3-bucket` (S3 Bucket, runner=tofu) — Provision an S3 bucket via golden-path module.
         - `s3-bucket-tg` (S3 Bucket (Terragrunt), runner=terragrunt) — Provision an S3 bucket via Terragrunt thin wrapper around the golden-path module.
+        - `secrets-manager` (Secrets Manager, runner=tofu) — Provision a Secrets Manager secret shell (populate values outside IssueOps).
+        - `vpc` (VPC, runner=tofu) — Provision a VPC with public and private subnets via golden-path module.
   - type: dropdown
     id: product
     attributes:
       label: Product
       description: Catalog product id (see list above).
       options:
+        - ecs-cluster
         - s3-bucket
         - s3-bucket-tg
+        - secrets-manager
+        - vpc
     validations:
       required: true
   - type: dropdown
@@ -43,14 +49,6 @@ body:
     validations:
       required: true
   - type: input
-    id: bucket_name
-    attributes:
-      label: Bucket name
-      description: Globally unique S3 bucket name (lowercase).
-      placeholder: my-app-assets-dev
-    validations:
-      required: true
-  - type: input
     id: project
     attributes:
       label: Project
@@ -58,14 +56,84 @@ body:
       placeholder: MyApp
     validations:
       required: true
+  - type: input
+    id: bucket_name
+    attributes:
+      label: Bucket name
+      description: Globally unique S3 bucket name (lowercase). Used by: `s3-bucket`, `s3-bucket-tg`.
+      placeholder: my-app-assets-dev
+    validations:
+      required: false
   - type: dropdown
     id: enable_versioning
     attributes:
       label: Enable versioning
-      description: Enable S3 bucket versioning.
+      description: Enable S3 bucket versioning. Used by: `s3-bucket`, `s3-bucket-tg`.
       options:
         - "true"
         - "false"
       default: 0
     validations:
-      required: true
+      required: false
+  - type: input
+    id: vpc_name
+    attributes:
+      label: Vpc name
+      description: VPC name tag (alnum/hyphen). Used by: `vpc`.
+      placeholder: app-dev-vpc
+    validations:
+      required: false
+  - type: input
+    id: cidr_block
+    attributes:
+      label: Cidr block
+      description: VPC CIDR must be /16. Public/private /24 subnets are derived automatically. Used by: `vpc`.
+      placeholder: 10.20.0.0/16
+    validations:
+      required: false
+  - type: dropdown
+    id: create_nat_gateway
+    attributes:
+      label: Create nat gateway
+      description: Create a single NAT Gateway for private subnets (costs apply). Used by: `vpc`.
+      options:
+        - "false"
+        - "true"
+      default: 0
+    validations:
+      required: false
+  - type: input
+    id: cluster_name
+    attributes:
+      label: Cluster name
+      description: ECS cluster name. Used by: `ecs-cluster`.
+      placeholder: app-dev
+    validations:
+      required: false
+  - type: dropdown
+    id: enable_container_insights
+    attributes:
+      label: Enable container insights
+      description: Enable CloudWatch Container Insights (extra cost). Used by: `ecs-cluster`.
+      options:
+        - "false"
+        - "true"
+      default: 0
+    validations:
+      required: false
+  - type: input
+    id: secret_name
+    attributes:
+      label: Secret name
+      description: Secret name/path (no secret values in the Issue Form). Used by: `secrets-manager`.
+      placeholder: app/dev/db
+    validations:
+      required: false
+  - type: input
+    id: secret_description
+    attributes:
+      label: Secret description
+      description: Optional human description (ASCII). Used by: `secrets-manager`.
+      placeholder: Application database credentials
+    validations:
+      required: false

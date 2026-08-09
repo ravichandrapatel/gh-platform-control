@@ -1,0 +1,7 @@
+# Example backend fragment for this stack. Workload CI should pass -backend-config
+# from a secured store or repo variable — do not commit real account secrets.
+bucket         = "{{STATE_BUCKET}}"
+key            = "stacks/{{STACK_ID}}/terraform.tfstate"
+region         = "{{AWS_REGION}}"
+encrypt        = true
+use_lockfile   = true

@@ -1,6 +1,6 @@
 # FILE_NAME: generate_form.py
 # DESCRIPTION: Generate .github/ISSUE_TEMPLATE/provision.yml from catalog + environments.
-# VERSION: 0.1.0
+# VERSION: 0.2.0
 from __future__ import annotations
 
 import argparse
@@ -54,8 +54,14 @@ def humanize(key: str) -> str:
 
 
 def merge_input_specs(products: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """Union of catalog inputs (excluding environment — sourced from environments.yaml)."""
+    """Union of catalog inputs (excluding environment — sourced from environments.yaml).
+
+    Form-level `required` is true only when *every* product defines the input and
+    marks it required. Product-specific fields stay optional on the shared form;
+    `validate-request` still enforces per-product required inputs.
+    """
     merged: dict[str, dict[str, Any]] = {}
+    product_ids = [str(p["id"]) for p in products]
     for prod in products:
         inputs = prod.get("inputs") or {}
         if not isinstance(inputs, dict):
@@ -68,12 +74,14 @@ def merge_input_specs(products: list[dict[str, Any]]) -> dict[str, dict[str, Any
             if name not in merged:
                 merged[name] = dict(spec)
                 merged[name]["_products"] = [prod["id"]]
+                merged[name]["_required_products"] = (
+                    [prod["id"]] if spec.get("required") else []
+                )
                 continue
             prev = merged[name]
             prev["_products"].append(prod["id"])
-            # Required if any product requires it.
             if spec.get("required"):
-                prev["required"] = True
+                prev.setdefault("_required_products", []).append(prod["id"])
             if spec.get("enum") is not None:
                 enum = spec["enum"]
                 if not isinstance(enum, list):
@@ -104,7 +112,17 @@ def merge_input_specs(products: list[dict[str, Any]]) -> dict[str, dict[str, Any
         enum = spec.get("enum")
         if enum is not None and not isinstance(enum, list):
             fail(f"input {name!r}: enum must be a YAML list, got {type(enum).__name__}")
-        spec.pop("_products", None)
+        owners = list(spec.pop("_products", []))
+        required_owners = list(spec.pop("_required_products", []))
+        # Shared-required only: every catalog product defines + requires this input.
+        spec["required"] = (
+            set(owners) == set(product_ids) and set(required_owners) == set(product_ids)
+        )
+        if owners and not spec["required"]:
+            only = ", ".join(f"`{p}`" for p in owners)
+            hint = f"Used by: {only}."
+            desc = str(spec.get("description") or "").strip()
+            spec["description"] = f"{desc} {hint}".strip() if desc else hint
     return merged
 
 
@@ -179,8 +197,19 @@ def render_form(
         ]
     )
 
-    # Stable field order: known S3-ish keys first, then alpha.
-    preferred = ("bucket_name", "project", "enable_versioning")
+    # Stable field order: shared keys first, then product-specific alpha.
+    preferred = (
+        "project",
+        "bucket_name",
+        "enable_versioning",
+        "vpc_name",
+        "cidr_block",
+        "create_nat_gateway",
+        "cluster_name",
+        "enable_container_insights",
+        "secret_name",
+        "secret_description",
+    )
     ordered = [k for k in preferred if k in inputs] + sorted(
         k for k in inputs if k not in preferred
     )
