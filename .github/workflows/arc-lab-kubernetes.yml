@@ -1,0 +1,15 @@
+name: ARC lab — containerMode kubernetes
+on:
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: arc-runners-kubernetes
+    container:
+      image: node:20-bookworm
+    steps:
+      - name: Prove kubernetes containerMode
+        run: |
+          set -euo pipefail
+          echo "mode=containerMode-kubernetes"
+          node -v
+          hostname
