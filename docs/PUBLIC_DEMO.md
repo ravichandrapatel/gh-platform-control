@@ -10,8 +10,8 @@ token mint, workload PRs).
 
 ## Controls in this repo
 
-1. Issue Form labels are empty — maintainers add `issueops` + `product:*` after triage.
-2. `scripts/authorize_requester.py` fails closed unless the **issue author** is in
+1. Issue Form labels are empty — maintainers add `issueops` after triage (product is chosen in the form; workflow syncs `product:*`).
+2. `python3 -m gh_platform_control authorize` fails closed unless the **issue author** is in
    [`config/operators.yaml`](../config/operators.yaml) or has write+ on the control repo.
 3. Workload repos (`infra-dev` / `infra-prod`) should stay **private**.
 4. App private key stays in control Actions secrets (never in git).

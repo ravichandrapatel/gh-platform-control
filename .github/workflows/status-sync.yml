@@ -1,6 +1,6 @@
 # FILE_NAME: status-sync.yml
 # DESCRIPTION: Update IssueOps issue labels + Deployment from workload callbacks.
-# VERSION: 0.1.0
+# VERSION: 0.2.0
 
 name: status-sync
 
@@ -30,6 +30,24 @@ jobs:
           : "${ISSUE:?missing issue_number in client_payload}"
           : "${STATE:?missing state in client_payload}"
 
+          # Fail closed on malformed callbacks (injection / typos).
+          if [[ ! "${ISSUE}" =~ ^[0-9]+$ ]]; then
+            echo "::error::issue_number must be digits"
+            exit 1
+          fi
+          if [[ -n "${DEP_ID:-}" && ! "${DEP_ID}" =~ ^[0-9]+$ ]]; then
+            echo "::error::deployment_id must be digits when set"
+            exit 1
+          fi
+          if [[ -n "${LOG_URL:-}" && "${LOG_URL}" != https://* ]]; then
+            echo "::error::log_url must be an https:// URL when set"
+            exit 1
+          fi
+          # Bound free-text to keep comments readable and limit abuse surface.
+          if [[ ${#MESSAGE} -gt 2000 ]]; then
+            MESSAGE="${MESSAGE:0:2000}…"
+          fi
+
           case "${STATE}" in
             plan_ok)
               label="status:plan-ok"
@@ -53,7 +71,7 @@ jobs:
               ;;
           esac
 
-          for stale in status:pending-validation status:pr-open status:plan-ok status:plan-failed status:applied status:apply-failed status:validation-failed; do
+          for stale in status:pending-validation status:pr-open status:plan-ok status:plan-failed status:applied status:apply-failed status:validation-failed status:config-error status:provision-failed; do
             gh issue edit "${ISSUE}" --repo "${{ github.repository }}" --remove-label "${stale}" 2>/dev/null || true
           done
           gh issue edit "${ISSUE}" --repo "${{ github.repository }}" --add-label "${label}"
@@ -73,7 +91,7 @@ jobs:
               args+=(-f log_url="${LOG_URL}" -f environment_url="${LOG_URL}")
             fi
             if [[ -n "${MESSAGE:-}" ]]; then
-              args+=(-f description="${MESSAGE}")
+              args+=(-f description="${MESSAGE:0:140}")
             fi
             gh api "${args[@]}"
           fi

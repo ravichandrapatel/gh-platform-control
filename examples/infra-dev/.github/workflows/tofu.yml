@@ -1,6 +1,6 @@
 # FILE_NAME: tofu.yml
 # DESCRIPTION: infra-dev workload CI — plan on PR, apply on main via tofu-pipeline.
-# VERSION: 0.1.0
+# VERSION: 0.2.0
 
 name: tofu
 
@@ -9,6 +9,7 @@ on:
     paths:
       - "stacks/**"
       - ".github/workflows/tofu.yml"
+      - "scripts/check_new_stacks.py"
   push:
     branches: [main]
     paths:
@@ -19,6 +20,23 @@ permissions:
   id-token: write
 
 jobs:
+  guard-new-stacks:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: New stacks require IssueOps
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}" --depth=1 || true
+          python3 scripts/check_new_stacks.py \
+            --base-ref "origin/${{ github.base_ref }}" \
+            --head-ref-name "${HEAD_REF}"
+
   detect:
     runs-on: ubuntu-latest
     outputs:
@@ -43,7 +61,7 @@ jobs:
           echo "dirs=${json}" >> "${GITHUB_OUTPUT}"
 
   plan:
-    needs: detect
+    needs: [guard-new-stacks, detect]
     if: github.event_name == 'pull_request' && needs.detect.outputs.dirs != '[]'
     strategy:
       fail-fast: false

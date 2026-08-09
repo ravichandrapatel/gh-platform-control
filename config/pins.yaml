@@ -1,9 +1,13 @@
 # Immutable pins only. Floating refs (main/master/latest/HEAD) are rejected.
 # Replace OWNER after remotes exist.
+#
+# After merging dual-runner changes to gh-platform-actions, bump actions.ref to the
+# new 40-char SHA and update every infra-* tofu.yml / drift.yml uses:@ pin.
 
 actions:
   repository: ravichandrapatel/gh-platform-actions
   # Immutable SHA on main that includes tofu-pipeline.
+  # NOTE: bump after publishing actions dual-runner (tofu + terragrunt) commit.
   ref: abb8ce241fb130b69ba9512bc5c9f722eb3795a0
 
 modules:

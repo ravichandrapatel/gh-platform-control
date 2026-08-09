@@ -1,30 +1,18 @@
-#!/usr/bin/env python3
-# FILE_NAME: parse_issue.py
+# FILE_NAME: parse.py
 # DESCRIPTION: Parse GitHub Issue Form markdown body into JSON.
-# VERSION: 0.1.0
+# VERSION: 0.1.1
 from __future__ import annotations
 
 import argparse
 import json
 import re
-import sys
-
 
 HEADING_RE = re.compile(r"^###\s+(.+?)\s*$")
 
 
 def slug_key(label: str) -> str:
-    key = label.strip().lower()
-    key = key.replace(" ", "_")
-    key = re.sub(r"[^a-z0-9_]+", "", key)
-    aliases = {
-        "bucket_name": "bucket_name",
-        "environment": "environment",
-        "project": "project",
-        "enable_versioning": "enable_versioning",
-        "product": "product",
-    }
-    return aliases.get(key, key)
+    key = label.strip().lower().replace(" ", "_")
+    return re.sub(r"[^a-z0-9_]+", "", key)
 
 
 def parse_issue_body(body: str) -> dict[str, str]:
@@ -62,11 +50,13 @@ def parse_issue_body(body: str) -> dict[str, str]:
     return fields
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+def run(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Parse GitHub Issue Form markdown body into JSON."
+    )
     parser.add_argument("--body-file", required=True)
     parser.add_argument("--out", required=True)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     with open(args.body_file, encoding="utf-8") as f:
         body = f.read()
@@ -78,5 +68,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def main() -> int:
+    return run()

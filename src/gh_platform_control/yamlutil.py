@@ -1,4 +1,4 @@
-# FILE_NAME: lib_yaml.py
+# FILE_NAME: yamlutil.py
 # DESCRIPTION: Minimal YAML subset loader (stdlib only) for control config.
 # VERSION: 0.1.0
 from __future__ import annotations

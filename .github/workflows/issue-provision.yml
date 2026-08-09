@@ -1,6 +1,6 @@
 # FILE_NAME: issue-provision.yml
 # DESCRIPTION: IssueOps — validate form, render stack, open workload PR, track Deployment.
-# VERSION: 0.4.0
+# VERSION: 0.7.0
 
 name: issue-provision
 
@@ -13,13 +13,14 @@ permissions:
   issues: write
   deployments: write
 
+env:
+  PYTHONPATH: src
+
 jobs:
   provision:
     # Labels are NOT auto-applied by the public Issue Form (see ISSUE_TEMPLATE).
-    # Workflow runs only after issueops + product:* are present (manual label).
-    if: >-
-      contains(github.event.issue.labels.*.name, 'issueops') &&
-      contains(github.event.issue.labels.*.name, 'product:s3-bucket')
+    # Product is chosen in the form body; operators only need to add issueops.
+    if: contains(github.event.issue.labels.*.name, 'issueops')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout control
@@ -31,10 +32,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.event.issue.user.login }}
           REPOSITORY: ${{ github.repository }}
-          PYTHONPATH: scripts
         run: |
           set -euo pipefail
-          python3 scripts/authorize_requester.py \
+          python3 -m gh_platform_control authorize \
             --root . \
             --actor "${ACTOR}" \
             --repository "${REPOSITORY}" \
@@ -44,30 +44,59 @@ jobs:
         id: cfg
         run: |
           set -euo pipefail
-          ALLOW_PIN_PLACEHOLDERS=1 ./scripts/validate-pins.sh
-          ALLOW_PLACEHOLDERS=1 ./scripts/validate-control.sh
+          ALLOW_PIN_PLACEHOLDERS=1 python3 -m gh_platform_control validate-pins
+          ALLOW_PLACEHOLDERS=1 python3 -m gh_platform_control validate-control
 
       - name: Parse issue body
         id: parse
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
-          PYTHONPATH: scripts
         run: |
           set -euo pipefail
           printf '%s\n' "${ISSUE_BODY}" > /tmp/issue-body.md
-          python3 scripts/parse_issue.py --body-file /tmp/issue-body.md --out /tmp/request.json
+          python3 -m gh_platform_control parse-issue --body-file /tmp/issue-body.md --out /tmp/request.json
+          product="$(python3 -c 'import json; print(json.load(open("/tmp/request.json")).get("product","").strip())')"
+          if [[ -z "${product}" ]]; then
+            echo "::error::missing Product field in issue form body"
+            exit 1
+          fi
+          if [[ ! "${product}" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+            echo "::error::invalid Product id (expected lowercase alnum/hyphen)"
+            exit 1
+          fi
+          echo "id=${product}" >> "${GITHUB_OUTPUT}"
+
+      - name: Sync product label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRODUCT: ${{ steps.parse.outputs.id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Keep product:* labels for filters/status; form field is source of truth.
+          # PRODUCT already validated as safe slug in parse step.
+          existing="$(gh issue view "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --json labels --jq '.labels[].name' | grep '^product:' || true)"
+          for lbl in ${existing}; do
+            if [[ "${lbl}" != "product:${PRODUCT}" ]]; then
+              gh issue edit "${ISSUE_NUMBER}" --repo "${REPOSITORY}" --remove-label "${lbl}" || true
+            fi
+          done
+          gh issue edit "${ISSUE_NUMBER}" \
+            --repo "${REPOSITORY}" \
+            --add-label "product:${PRODUCT}" || true
 
       - name: Validate request
         id: validate
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           CONTROL_REPO: ${{ github.repository }}
-          PYTHONPATH: scripts
+          PRODUCT: ${{ steps.parse.outputs.id }}
         run: |
           set -euo pipefail
-          python3 scripts/validate_request.py \
+          python3 -m gh_platform_control validate-request \
             --request-json /tmp/request.json \
-            --product s3-bucket \
+            --product "${PRODUCT}" \
             --root . \
             --issue-number "${ISSUE_NUMBER}" \
             --control-repo "${CONTROL_REPO}" \
@@ -76,14 +105,13 @@ jobs:
           echo "workload=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["workload_repository"])')" >> "${GITHUB_OUTPUT}"
           echo "workload_repo=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["workload_repository"].split("/",1)[1])')" >> "${GITHUB_OUTPUT}"
           echo "environment=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json"))["environment"])')" >> "${GITHUB_OUTPUT}"
+          echo "runner=$(python3 -c 'import json; print(json.load(open("/tmp/resolved.json")).get("runner","tofu"))')" >> "${GITHUB_OUTPUT}"
 
       - name: Render stack
         id: render
-        env:
-          PYTHONPATH: scripts
         run: |
           set -euo pipefail
-          python3 scripts/render_stack.py \
+          python3 -m gh_platform_control render-stack \
             --resolved-json /tmp/resolved.json \
             --root . \
             --out-dir /tmp/stack-out
@@ -121,10 +149,9 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CONTROL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PYTHONPATH: scripts
         run: |
           set -euo pipefail
-          python3 scripts/check_duplicate_resource.py \
+          python3 -m gh_platform_control check-duplicate \
             --resolved-json /tmp/resolved.json \
             --out-dir . \
             --attach
@@ -135,8 +162,10 @@ jobs:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
-          chmod +x scripts/open_workload_pr.sh
-          scripts/open_workload_pr.sh /tmp/resolved.json /tmp/stack-out "${APP_TOKEN}"
+          python3 -m gh_platform_control open-workload-pr \
+            --resolved-json /tmp/resolved.json \
+            --stack-src /tmp/stack-out \
+            --token "${APP_TOKEN}"
           echo "url=$(cat .pr-url)" >> "${GITHUB_OUTPUT}"
           echo "mode=$(cat .pr-mode 2>/dev/null || echo created)" >> "${GITHUB_OUTPUT}"
 
@@ -218,7 +247,7 @@ jobs:
           | Mode | \`${mode}\` |
           | Deployment id | \`${DEP_ID}\` |
 
-          Next: review the PR; workload CI runs \`tofu-pipeline\` plan. Merge + Environment approval applies.
+          Next: review the PR; workload CI runs \`tofu-pipeline\` plan (OpenTofu or Terragrunt auto-detect). Merge + Environment approval applies.
           EOF
           )"
 
@@ -231,10 +260,15 @@ jobs:
           PARSE: ${{ steps.parse.outcome }}
           VALIDATE: ${{ steps.validate.outcome }}
           RENDER: ${{ steps.render.outcome }}
+          CREDS: ${{ steps.require-creds.outcome }}
           APP: ${{ steps.app-token.outcome }}
           DUP: ${{ steps.duplicate.outcome }}
           PR: ${{ steps.pr.outcome }}
           DEPLOY: ${{ steps.deploy.outcome }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
           label="status:provision-failed"
@@ -242,7 +276,7 @@ jobs:
           if [[ "${AUTHZ}" == "failure" ]]; then
             label="status:validation-failed"
             reason="authorization (issue author not an operator)"
-          elif [[ "${CFG}" == "failure" || "${APP}" == "failure" ]]; then
+          elif [[ "${CFG}" == "failure" || "${CREDS}" == "failure" || "${APP}" == "failure" ]]; then
             label="status:config-error"
             reason="config (pins/App credentials/token)"
           elif [[ "${PARSE}" == "failure" || "${VALIDATE}" == "failure" || "${RENDER}" == "failure" || "${DUP}" == "failure" ]]; then
@@ -253,9 +287,8 @@ jobs:
             reason="provision (PR/deployment)"
           fi
 
-
-          gh issue edit "${{ github.event.issue.number }}" \
-            --repo "${{ github.repository }}" \
+          gh issue edit "${ISSUE_NUMBER}" \
+            --repo "${REPOSITORY}" \
             --remove-label "status:pending-validation" \
             --remove-label "status:validation-failed" \
             --remove-label "status:config-error" \
@@ -267,12 +300,12 @@ jobs:
             exit 0
           fi
 
-          gh issue comment "${{ github.event.issue.number }}" \
-            --repo "${{ github.repository }}" \
+          gh issue comment "${ISSUE_NUMBER}" \
+            --repo "${REPOSITORY}" \
             --body "$(cat <<EOF
           ### IssueOps failed (\`${reason}\`)
 
           Label: \`${label}\`
-          Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          Workflow: ${SERVER_URL}/${REPOSITORY}/actions/runs/${RUN_ID}
           EOF
           )" || true

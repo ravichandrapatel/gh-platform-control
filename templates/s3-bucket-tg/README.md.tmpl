@@ -1,0 +1,13 @@
+# Stack `{{STACK_ID}}`
+
+| Field | Value |
+| --- | --- |
+| Product | s3-bucket-tg |
+| Runner | terragrunt |
+| Environment | {{ENVIRONMENT}} |
+| Control issue | {{CONTROL_REPO}}#{{ISSUE_NUMBER}} |
+| Module | `{{MODULES_REPOSITORY}}//s3?ref={{MODULE_REF}}` |
+| Bucket | `{{BUCKET_NAME}}` |
+
+Provisioned via IssueOps (thin Terragrunt). Plan/apply runs in this workload repo
+through `tofu-pipeline` (auto-detects `terragrunt.hcl`). Requires repo-root `root.hcl`.

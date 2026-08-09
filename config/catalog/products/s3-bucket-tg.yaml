@@ -1,10 +1,9 @@
-# Product catalog entry — S3 via OpenTofu root (unified Issue Form product dropdown).
-id: s3-bucket
-title: S3 Bucket
-description: Provision an S3 bucket via golden-path module.
-template: s3-bucket
-# tofu = rendered OpenTofu root; terragrunt = thin terragrunt.hcl wrapper.
-runner: tofu
+# Product catalog entry — S3 via thin Terragrunt wrapper (same module pins).
+id: s3-bucket-tg
+title: S3 Bucket (Terragrunt)
+description: Provision an S3 bucket via Terragrunt thin wrapper around the golden-path module.
+template: s3-bucket-tg
+runner: terragrunt
 module:
   path: s3
   ref: s3/v1.0.0
@@ -33,5 +32,6 @@ stack_id_from:
   - product
   - bucket_name
 # Uniqueness within an environment (workload repo). Git is source of truth.
+# Bucket name is unique per env across tofu + terragrunt products (duplicate scan).
 uniqueness_key_from:
   - bucket_name

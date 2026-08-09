@@ -1,16 +1,27 @@
 # gh-platform-control architecture
 
 Zero-cost, GitHub-only IDP control plane. **One** control repo for intake;
-**per-env workload repos** (one AWS account each) own OpenTofu roots and apply.
+**per-env workload repos** (one AWS account each) own OpenTofu / thin Terragrunt
+stacks and apply.
 
 ## Layers
 
 | Repo | Role | Release unit |
 | --- | --- | --- |
-| `gh-platform-control` | IssueOps intake, catalog, pins, codegen, status | Config + workflows on `main` |
+| `gh-platform-control` | IssueOps/EnvOps intake (`src/gh_platform_control`), catalog, pins, codegen, status | Config + workflows on `main` |
 | `infra-<env>` (workload) | GitOps stacks + `tofu-pipeline` + `drift-reconcile` | Protected `main` per account |
-| `gh-platform-actions` | Reusable `tofu-pipeline`, `drift-reconcile`, policies | Commit SHA |
+| `gh-platform-actions` | Reusable `tofu-pipeline`, `drift-reconcile`, policies | Commit **SHA** |
 | `gh-platform-modules` | OpenTofu modules | Annotated SemVer tags (`s3/vX.Y.Z`) |
+
+## Dual runners
+
+| Catalog `runner` | Stack layout | Workload CI |
+| --- | --- | --- |
+| `tofu` (default) | Rendered OpenTofu root (`main.tf`, …) | `tofu-pipeline` (`iac_tool: auto`) |
+| `terragrunt` | Thin `terragrunt.hcl` + repo `root.hcl` | Same pipeline; detects `terragrunt.hcl` |
+
+Demo products: `s3-bucket` (tofu) and `s3-bucket-tg` (terragrunt). Bucket uniqueness is
+env-scoped across both. No Gruntwork live `dependency` graphs in v1.
 
 ## Flow
 
@@ -47,16 +58,20 @@ Control **never** assumes AWS roles for apply. OIDC trust and real GitHub Enviro
 | --- | --- |
 | `config/pins.yaml` | Immutable `gh-platform-actions` SHA |
 | `config/environments.yaml` | env → workload repo, account, role, region |
-| `config/catalog/products/*.yaml` | Product allowlists + module pin hints |
+| `config/catalog/products/*.yaml` | Product allowlists + module pin + `runner` |
 | `templates/<product>/` | Codegen skeletons |
-| `examples/infra-dev/`, `examples/infra-prod/` | Workload starters (dev + prod only) |
+| `examples/infra-dev/`, `examples/infra-prod/` | Workload starters (dev + prod only; include `root.hcl` for TG) |
 
 ## Extensibility
 
-MVP unit is **environment = AWS account**. Add rows to `environments.yaml` (and later
-team/product dimensions) without copying this control plane.
+MVP unit is **environment = AWS account**. Prefer **EnvOps** (Onboard environment Issue Form +
+`envops` label) to create `infra-<env>`, ruleset, variables, and a control PR that adds the
+`environments.yaml` row. Manual registry edits remain supported.
 
 ## Break-glass
 
-Do not run OpenTofu inside this repo. Emergency changes: PR directly on the
-workload repo (same `tofu-pipeline` gates).
+Do not run OpenTofu inside the **control** repo.
+
+- **Day-2 value changes** on onboarded stacks: users (and owners) PR edits under existing `stacks/<id>/`.
+- **New stacks:** IssueOps only (`issueops/*` branch). No human DIY create — including owners/admins. Enforce with `guard-new-stacks` + rulesets that **deny admin bypass** ([docs/WORKLOAD_RULESETS.md](docs/WORKLOAD_RULESETS.md)).
+- Apply still goes through workload `tofu-pipeline` + Environment gates.

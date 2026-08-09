@@ -1,16 +1,38 @@
 # IssueOps
 
-Primary self-service path for this control plane.
+Primary self-service paths for this control plane.
 
-## Request
+## Request (stack provision)
 
-1. **Issues → New issue → Provision S3 bucket** (add products by cloning the form + catalog entry + template).
-2. An **authorized operator** labels the issue `issueops` + `product:<id>` (+ `status:pending-validation`).
+1. **Issues → New issue → Provision infrastructure** (single form; pick **Product** in the body).
+2. An **authorized operator** labels the issue `issueops` (+ `status:pending-validation`).
    The public form does **not** auto-apply those labels (prevents drive-by provision on a public demo).
-3. Workflow `issue-provision` runs only with those labels **and** passes author authz
-   (`config/operators.yaml` and/or repo write collaborator).
+3. Workflow `issue-provision` runs with `issueops` **and** passes author authz
+   (`config/operators.yaml` and/or repo write collaborator). Product comes from the form field;
+   the workflow syncs `product:<id>` for filters.
 4. On success: workload PR link, tracking Deployment id (`issueops-<env>`), label `status:pr-open`.
 5. On failure: label `status:validation-failed` + run link.
+
+## Request (environment onboard — EnvOps)
+
+1. **Issues → New issue → Onboard environment** (slug, profile, AWS account/role/region).
+2. Operator labels **`envops`** (same authz as stack IssueOps).
+3. Workflow `issue-env-onboard` creates `infra-<env>`, applies ruleset/vars/secret, opens control PR
+   `envops/<env>` for `environments.yaml` + regenerated provision form. Label `status:env-ready`.
+4. If `infra-<env>` or the registry key already exists → **fail closed**.
+5. AWS OIDC / state remain manual ([OIDC_AND_BACKEND.md](OIDC_AND_BACKEND.md)).
+
+Labels: `python3 -m gh_platform_control bootstrap-labels` creates `issueops`, `envops`, and status labels.
+
+## Runners (`tofu` vs `terragrunt`)
+
+| Product | `runner` | Template | Workload needs |
+| --- | --- | --- | --- |
+| `s3-bucket` | `tofu` | OpenTofu root (`main.tf.tmpl`, …) | — |
+| `s3-bucket-tg` | `terragrunt` | Thin `terragrunt.hcl.tmpl` | Repo-root `root.hcl` (see examples) |
+
+Catalog field `runner` defaults to `tofu`. Pipeline auto-detects `terragrunt.hcl` in the stack dir.
+Bucket uniqueness is shared across both S3 products in the same environment.
 
 ## Public demo security
 
@@ -49,8 +71,8 @@ Control **does not** query AWS for existence.
 | Layer | Where | What |
 | --- | --- | --- |
 | Form schema | Issue Form YAML | required fields, dropdowns |
-| Catalog | `scripts/validate_request.py` | patterns, enums, env allowlist, natural-key stack id |
-| Duplicate key | `scripts/check_duplicate_resource.py` | control claim issues + open PRs + `main` |
+| Catalog | `validate-request` | patterns, enums, env allowlist, natural-key stack id |
+| Duplicate key | `check-duplicate` | control claim issues + open PRs + `main` |
 | Control CI | `validate-control.sh` | registry + templates exist |
 | Workload CI | `tofu-pipeline` | Checkov, plan, Conftest |
 | Apply gate | Workload Environment + `confirm_apply` | human approval on prod |
@@ -76,7 +98,8 @@ Policy summary: **fail** for a different issue; **attach** cross-links on fail; 
 | Label | Meaning |
 | --- | --- |
 | `issueops` | Intake issue |
-| `product:s3-bucket` | Product router |
+| `product:s3-bucket` | Synced from form (OpenTofu S3) |
+| `product:s3-bucket-tg` | Synced from form (Terragrunt S3) |
 | `status:pending-validation` | Form submitted |
 | `status:pr-open` | Workload PR opened |
 | `status:plan-ok` / `plan-failed` | From `status-sync` |
@@ -86,7 +109,7 @@ Policy summary: **fail** for a different issue; **attach** cross-links on fail; 
 ## Bootstrap labels
 
 ```bash
-./scripts/bootstrap-labels.sh OWNER/gh-platform-control
+PYTHONPATH=src python3 -m gh_platform_control bootstrap-labels OWNER/gh-platform-control
 ```
 
 Creates `issueops`, `product:*`, and `status:*` labels (including `status:config-error` vs `status:validation-failed`).
@@ -101,9 +124,11 @@ Creates `issueops`, `product:*`, and `status:*` labels (including `status:config
 
 ## Adding a product
 
-1. `config/catalog/products/<id>.yaml` — set `stack_id_from` + `uniqueness_key_from`
+1. `config/catalog/products/<id>.yaml` — inputs, `runner`, module pins, stack/uniqueness keys
 2. `templates/<id>/*.tmpl`
-3. `.github/ISSUE_TEMPLATE/<id>.yml` with labels `issueops` + `product:<id>`
-4. Extend `issue-provision.yml` `if:` (or generalize product detection from labels).
-5. Extend `check_duplicate_resource.py` if the product’s natural key is not `bucket_name`.
-6. `./scripts/bootstrap-labels.sh` for any new `product:*` label.
+3. Regenerate the Issue Form: `PYTHONPATH=src python3 -m gh_platform_control generate-issue-form`
+4. Extend `check_duplicate_resource.py` if uniqueness is not `bucket_name`
+5. `PYTHONPATH=src python3 -m gh_platform_control bootstrap-labels` for `product:<id>`
+6. Terragrunt products: ensure workload examples ship `root.hcl`
+
+Do **not** hand-edit `.github/ISSUE_TEMPLATE/provision.yml` — it is generated from the catalog + `environments.yaml`. CI runs `python3 -m gh_platform_control generate-issue-form --check`.

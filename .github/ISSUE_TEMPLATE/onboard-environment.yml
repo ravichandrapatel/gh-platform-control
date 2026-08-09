@@ -1,0 +1,63 @@
+name: Onboard environment
+description: Create a new infra-<env> workload repo (authorized operators only).
+title: "[env] "
+# Do NOT auto-apply labels — maintainers add: envops, status:pending-validation
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Gate:** opening this form does **not** create anything.
+        An authorized operator must label the issue with `envops` (and be listed in
+        `config/operators.yaml` or have write access on this repo).
+
+        Automation (GitHub-only): create `infra-<env>`, copy starter code, apply
+        branch ruleset, create GitHub Environment + variables, copy `MODULES_GIT_TOKEN`,
+        open a control PR for `environments.yaml` + regenerated Issue Form.
+
+        **Not automated:** AWS IAM OIDC trust / deploy role / state bucket — complete
+        those after the control PR merges (see issue comment checklist).
+  - type: input
+    id: environment_name
+    attributes:
+      label: Environment name
+      description: Short slug (lowercase). Becomes registry key, GitHub Environment, and repo `infra-<slug>`.
+      placeholder: staging
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile
+      description: Starter tree and drift posture.
+      options:
+        - non-prod
+        - prod
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: aws_account_id
+    attributes:
+      label: AWS account ID
+      description: 12-digit account id for this environment (OIDC target).
+      placeholder: "123456789012"
+    validations:
+      required: true
+  - type: input
+    id: aws_role_arn
+    attributes:
+      label: AWS role ARN
+      description: GitHub Actions OIDC deploy role ARN (must exist or be created out-of-band).
+      placeholder: arn:aws:iam::123456789012:role/gh-platform-staging
+    validations:
+      required: true
+  - type: input
+    id: aws_region
+    attributes:
+      label: AWS region
+      description: Default AWS region for tofu/terragrunt.
+      placeholder: us-east-1
+      value: us-east-1
+    validations:
+      required: true
