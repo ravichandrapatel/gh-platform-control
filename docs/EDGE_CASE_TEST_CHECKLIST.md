@@ -1,79 +1,46 @@
 # Edge-case test checklist — gh-platform-control
 
-**Scope:** Python app (`src/gh_platform_control`), IssueOps, EnvOps, CI, GitHub UI.  
+**Scope:** Python app (`src/gh_platform_control`), IssueOps, EnvOps, CI, GitHub UI, adversarial abuse.  
 **Rule:** If any case fails → fix → **restart from T00** (do not skip).
 
-**Legend:** `[ ]` pending · `[x]` pass · `[F]` fail · `[S]` skipped (blocked / no env) · `[N/A]` not applicable
+**Legend:** `[ ]` pending · `[x]` pass · `[F]` fail · `[S]` skipped · `[N/A]` not applicable
 
 ---
 
 ## T00 — Preconditions
 
-| ID | Case | How | Pass criteria | Result |
-| --- | --- | --- | --- | --- |
-| T00.1 | Repo pushed; PR or main HEAD includes `src/` and no flat `scripts/` | `gh api` / UI | Tree matches local | [x] |
-| T00.2 | `gh auth` as operator who can open issues / see Actions | `gh auth status` | Logged in | [x] |
-| T00.3 | Control secrets present for live IssueOps | UI / `gh secret list` | `CONTROL_CLIENT_ID` + `CONTROL_APP_PRIVATE_KEY` (+ `CONTROL_USER_REPO_TOKEN` on personal accounts) | [x] |
-| T00.4 | Labels exist | `gh label list` | `issueops`, `envops`, status labels | [x] |
-
----
-
-## T1 — Local CLI: config gates
-
 | ID | Result |
 | --- | --- |
-| T1.1–T1.7 | [x] (2026-08-09 restart) |
+| T00.1–T00.4 | [x] |
 
 ---
 
-## T2 — Local CLI: parse / validate / render (stack)
+## T1–T5
 
-| ID | Result |
+| Suite | Result |
 | --- | --- |
-| T2.1–T2.13 | [x] |
+| T1 config gates | [x] |
+| T2 parse/validate/render | [x] (+ empty body product now denied — see T10.1) |
+| T3 EnvOps local | [x] |
+| T4 CI | [x] |
+| T5 templates (API) | [x] |
 
 ---
 
-## T3 — Local CLI: EnvOps validate / scaffold
-
-| ID | Result |
-| --- | --- |
-| T3.1–T3.9 | [x] (scaffold includes App mint inputs + actions SHA `870cca9e…`) |
-
----
-
-## T4 — GitHub CI (after push)
+## T6 — IssueOps live
 
 | ID | Result | Evidence |
 | --- | --- | --- |
-| T4.1–T4.5 | [x] | [ci run 31329167929](https://github.com/ravichandrapatel/gh-platform-control/actions/runs/31329167929) |
-| T4.6 | [x] | No top-level `scripts/*.py` / `gitops/` package |
-
----
-
-## T5 — GitHub UI: templates & navigation
-
-| ID | Result | Notes |
-| --- | --- | --- |
-| T5.1–T5.5 | [x] | Verified via API (browser not signed in) |
-
----
-
-## T6 — IssueOps live (stack)
-
-| ID | Result | Evidence |
-| --- | --- | --- |
-| T6.1 | [x] | Issue #30 → workflow **skipped** (no `issueops`) |
-| T6.2 | [S] | Needs alternate unauthorized user |
-| T6.3 | [x] | Issue #31 → [infra-dev#13](https://github.com/ravichandrapatel/infra-dev/pull/13) `status:pr-open` |
-| T6.4 | [x] | Issue #32 → duplicate fail+attach to #31 / PR#13 |
-| T6.5 | [S] | Covered by same-issue attach on #31 twin-run |
-| T6.6 | [S] | Not re-run this pass |
-| T6.7 | [x] | Issue #33 → `status:validation-failed` |
-| T6.8 | [x] | Issue #34 → [infra-dev#14](https://github.com/ravichandrapatel/infra-dev/pull/14) has `terragrunt.hcl` |
-| T6.9 | [x] | [infra-dev#15](https://github.com/ravichandrapatel/infra-dev/pull/15) `guard-new-stacks` **fail** |
-
-**App mint proof:** IssueOps stack [edge-mintfix-6300739](https://github.com/ravichandrapatel/infra-dev/actions/runs/31329587072) — **validate pass** after tag-root module source fix (plan may pend on AWS OIDC).
+| T6.1 | [x] | No label → skipped |
+| T6.2 | [x] | Issue #53 author `srt-coder-devops` → authorization failed |
+| T6.3 | [x] | Prior + T6.5 happy path |
+| T6.4 | [x] | Dup fail+attach |
+| T6.5 | [x] | Issue #55 re-edit → attach/reuse [infra-dev#20](https://github.com/ravichandrapatel/infra-dev/pull/20) |
+| T6.6 | [x] | Issue #54 missing Product → validation-failed |
+| T6.7 | [x] | Bad product `../x` |
+| T6.8 | [x] | Terragrunt product |
+| T6.9 | [x] | DIY non-issueops branch → guard fail |
+| T6.9b | [x] | **Hole then fix:** human `issueops/*` DIY passed guard → hardened; retest [PR#19](https://github.com/ravichandrapatel/infra-dev/pull/19) guard **fail**; App PR#20 still **pass** |
 
 ---
 
@@ -81,22 +48,13 @@
 
 | ID | Result | Evidence |
 | --- | --- | --- |
-| T7.1 | [x] | Issue #35 → **skipped** (no `envops`) |
-| T7.2 | [x] | Issue #36 → validation-failed (`dev` exists) |
-| T7.3 | [x] | Issue #50 → provision-failed (repo `infra-ciqa01242` exists) |
-| T7.4 | [x] | Issue #47 → `status:env-ready`; repo `infra-ciqa01315`; [registry PR#48](https://github.com/ravichandrapatel/gh-platform-control/pull/48) |
-| T7.5 | [x] | Issue #49 → validation-failed (ARN account mismatch) |
-| T7.6 | [S] | Not removing live `CONTROL_APP_PRIVATE_KEY` |
-| T7.7 | [x] | PR#48 files: `environments.yaml` + `provision.yml` |
-
-**Personal-account notes (this demo):**
-- `CONTROL_USER_REPO_TOKEN` required (`POST /user/repos` needs user PAT, not App IAT).
-- Private-repo **rulesets** need GitHub Pro — EnvOps continues with WARN.
-- Bare Environments (no protection-rule fields) for free plan.
+| T7.1–T7.5, T7.7 | [x] | Prior pass-2 |
+| T7.4 | [x] | `infra-ciqa01315` + registry PR#48 |
+| T7.6 | [x] | Workflow `require-creds` fails closed if `CONTROL_APP_PRIVATE_KEY` absent (static + gate review; live delete skipped to avoid losing PEM) |
 
 ---
 
-## T8 — Negative / security edges
+## T8 — Negative / security (local)
 
 | ID | Result |
 | --- | --- |
@@ -104,12 +62,29 @@
 
 ---
 
-## T9 — Regression restart gate
+## T10 — Adversarial / loophole hunt (pass 3)
+
+| ID | Persona | Attack | Result |
+| --- | --- | --- | --- |
+| T10.1 | Hacker | Empty body product + CLI `--product` override | [x] denied after fix (`validate-request`) |
+| T10.2 | Hacker | Actor/repo path injection in authorize | [x] denied |
+| T10.3 | Novice | XSS / shell metachar / spaces in inputs | [x] pattern/enum reject |
+| T10.4 | Hacker | EnvOps `../../etc`, reserved `main`/`control`, long slug | [x] denied |
+| T10.5 | Owner loophole | Branch `issueops-not-really` / `Issueops/` / nested path | [x] denied |
+| T10.6 | Owner loophole | Human opens `issueops/<stack>` + forges metadata | [x] **was hole** → fixed: require `[bot]` actor ([control#52](https://github.com/ravichandrapatel/gh-platform-control/pull/52), [infra-dev#18](https://github.com/ravichandrapatel/infra-dev/pull/18)) |
+| T10.7 | Hacker | Unregistered Environment in Issue Form | [x] #56 validation-failed |
+| T10.8 | Hacker | Unauthorized EnvOps author | [x] #57 authorization failed |
+| T10.9 | Hacker | Spoof `product:s3-bucket` label vs body `s3-bucket-tg` | [x] body wins → TG PR#21 + label synced to `product:s3-bucket-tg` |
+| T10.10 | Residual | Forge App `[bot]` identity | Residual: GitHub prevents humans registering `[bot]` logins; forged metadata alone insufficient without bot actor |
+
+---
+
+## T9 — Regression gate
 
 | ID | Result |
 | --- | --- |
-| T9.1 | [x] | Restarted after App mint + template + EnvOps personal-account fixes |
-| T9.2 | [x] | `validate-control` local OK; CI green on main |
+| T9.1 | [x] Restarted after security harden |
+| T9.2 | [x] App IssueOps guard still green on PR#20 |
 
 ---
 
@@ -117,5 +92,5 @@
 
 | Pass | Date | Notes |
 | --- | --- | --- |
-| 1 | 2026-08-09 | Earlier pass; T7.4 blocked on `MODULES_GIT_TOKEN`. |
-| 2 | 2026-08-09/10 | **App mint:** live `infra-dev` updated ([PR#12](https://github.com/ravichandrapatel/infra-dev/pull/12)); actions pin `870cca9e…`. Module sources fixed to tag-root ([control#37](https://github.com/ravichandrapatel/gh-platform-control/pull/37)). EnvOps personal-account: user PAT + bare Environment + best-effort ruleset. T7.4 happy path `ciqa01315`. `infra-prod` **N/A** (repo does not exist). |
+| 1–2 | 2026-08-09 | App mint + EnvOps personal-account path. |
+| 3 | 2026-08-10 | **Adversarial:** closed human `issueops/*` DIY hole; empty-product CLI hole; finished T6.2/5/6; F1–F3 abuse cases. |
