@@ -1,6 +1,6 @@
 # FILE_NAME: render.py
 # DESCRIPTION: Render product templates into a stack directory.
-# VERSION: 0.2.0
+# VERSION: 0.3.0
 from __future__ import annotations
 
 import argparse
@@ -43,6 +43,15 @@ def render_stack(*, root: Path, resolved: dict, out_dir: Path) -> int:
         "BUCKET_NAME": str(inputs.get("bucket_name", "")),
         "PROJECT": str(inputs.get("project", "")),
         "ENABLE_VERSIONING": str(inputs.get("enable_versioning", "true")).lower(),
+        "VPC_NAME": str(inputs.get("vpc_name", "")),
+        "CIDR_BLOCK": str(inputs.get("cidr_block", "")),
+        "CREATE_NAT_GATEWAY": str(inputs.get("create_nat_gateway", "false")).lower(),
+        "CLUSTER_NAME": str(inputs.get("cluster_name", "")),
+        "ENABLE_CONTAINER_INSIGHTS": str(
+            inputs.get("enable_container_insights", "false")
+        ).lower(),
+        "SECRET_NAME": str(inputs.get("secret_name", "")),
+        "SECRET_DESCRIPTION": str(inputs.get("secret_description", "")),
         "STATE_BUCKET": f"tfstate-{resolved.get('aws_account_id', 'ACCOUNT')}-{resolved['environment']}",
     }
 
