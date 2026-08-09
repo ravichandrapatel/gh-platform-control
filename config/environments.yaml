@@ -1,8 +1,9 @@
 # Environment registry: env name → AWS account + workload GitOps repo.
-# MVP: only dev and prod (one AWS account each).
+# MVP: one env = one AWS account = one workload repo.
+# Rows may be added by EnvOps (issue form + envops label).
 
 environments:
-  # Starter: examples/infra-dev/ → publish as infra-dev
+  # workload: ravichandrapatel/infra-dev
   dev:
     workload_repository: ravichandrapatel/infra-dev
     github_environment: dev
@@ -11,7 +12,7 @@ environments:
     aws_region: us-east-1
     tagging_environment: NON-PROD
 
-  # Starter: examples/infra-prod/ → publish as infra-prod (not created yet)
+  # workload: ravichandrapatel/infra-prod
   prod:
     workload_repository: ravichandrapatel/infra-prod
     github_environment: prod
@@ -19,3 +20,12 @@ environments:
     aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
     aws_region: us-east-1
     tagging_environment: PROD
+
+  # workload: ravichandrapatel/infra-ciqa01315
+  ciqa01315:
+    workload_repository: ravichandrapatel/infra-ciqa01315
+    github_environment: ciqa01315
+    aws_account_id: "123456789012"
+    aws_role_arn: arn:aws:iam::123456789012:role/gh-platform-dev
+    aws_region: us-east-1
+    tagging_environment: NON-PROD
