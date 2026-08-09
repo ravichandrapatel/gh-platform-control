@@ -8,7 +8,7 @@ actions:
   repository: ravichandrapatel/gh-platform-actions
   # Immutable SHA on main that includes tofu-pipeline.
   # NOTE: bump after publishing actions dual-runner (tofu + terragrunt) commit.
-  ref: 870cca9e868a842f5b5cceac7146df271445b3f2
+  ref: 5b98cefb71ee7ced9bbfa6323155331fce715c38
 
 modules:
   repository: ravichandrapatel/gh-platform-modules
