@@ -139,9 +139,16 @@ def onboard_environment(
     env["GH_TOKEN"] = token
     env["GIT_TERMINAL_PROMPT"] = "0"
 
+    user_tok = user_repo_token.strip()
+    # Existence probe must use a token that can see private user repos. App IATs
+    # often cannot until the new repo is covered by the installation.
+    probe_env = env.copy()
+    if user_tok:
+        probe_env["GH_TOKEN"] = user_tok
+
     exists = _run(
         ["gh", "api", f"repos/{workload_repository}"],
-        env=env,
+        env=probe_env,
         check=False,
         capture=True,
     )
@@ -159,7 +166,6 @@ def onboard_environment(
     # Installation tokens can POST /orgs/{org}/repos but not POST /user/repos
     # (personal accounts require a user PAT / UAT).
     if owner_type != "Organization":
-        user_tok = user_repo_token.strip()
         if not user_tok:
             fail(
                 "personal-account EnvOps requires CONTROL_USER_REPO_TOKEN "
