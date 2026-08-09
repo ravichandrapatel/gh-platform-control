@@ -126,6 +126,7 @@ jobs:
           APP_TOKEN: ${{ steps.app-token.outputs.token }}
           CONTROL_CLIENT_ID: ${{ vars.CONTROL_CLIENT_ID }}
           CONTROL_APP_PRIVATE_KEY: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
+          CONTROL_USER_REPO_TOKEN: ${{ secrets.CONTROL_USER_REPO_TOKEN }}
           MODULES_GIT_TOKEN: ${{ secrets.MODULES_GIT_TOKEN }}
         run: |
           set -euo pipefail
@@ -139,6 +140,9 @@ jobs:
           )
           if [[ -n "${MODULES_GIT_TOKEN:-}" ]]; then
             args+=(--modules-token "${MODULES_GIT_TOKEN}")
+          fi
+          if [[ -n "${CONTROL_USER_REPO_TOKEN:-}" ]]; then
+            args+=(--user-repo-token "${CONTROL_USER_REPO_TOKEN}")
           fi
           python3 -m gh_platform_control onboard-environment "${args[@]}"
           echo "url=$(cat .workload-url)" >> "${GITHUB_OUTPUT}"

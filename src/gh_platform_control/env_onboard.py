@@ -1,6 +1,6 @@
 # FILE_NAME: env_onboard.py
 # DESCRIPTION: Create infra-<env> repo, push scaffold, env/vars/secret/ruleset.
-# VERSION: 0.3.0
+# VERSION: 0.3.1
 from __future__ import annotations
 
 import argparse
@@ -24,15 +24,23 @@ def _run(
     capture: bool = False,
     input_text: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    proc = subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
         env=env,
-        check=check,
+        check=False,
         capture_output=capture,
         text=True,
         input=input_text,
     )
+    if check and proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        if detail:
+            print(detail, file=__import__("sys").stderr)
+        raise subprocess.CalledProcessError(
+            proc.returncode, proc.args, output=proc.stdout, stderr=proc.stderr
+        )
+    return proc
 
 
 def set_env_var(
@@ -96,6 +104,7 @@ def onboard_environment(
     app_private_key: str,
     ruleset_json: Path,
     modules_token: str = "",
+    user_repo_token: str = "",
 ) -> None:
     """INTENT: Create workload repo and configure env/vars/secret/ruleset.
     INPUT: Control root, resolved env plan, scaffold tree, App creds, ruleset path.
@@ -146,6 +155,20 @@ def onboard_environment(
     )
     owner_type = (owner_type_proc.stdout or "").strip()
     print(f"Creating {workload_repository} (owner type={owner_type})")
+
+    # Installation tokens can POST /orgs/{org}/repos but not POST /user/repos
+    # (personal accounts require a user PAT / UAT).
+    if owner_type != "Organization":
+        user_tok = user_repo_token.strip()
+        if not user_tok:
+            fail(
+                "personal-account EnvOps requires CONTROL_USER_REPO_TOKEN "
+                "(user PAT with repo create). GitHub App installation tokens "
+                "cannot call POST /user/repos. Prefer an organization owner, "
+                "or set the secret on control."
+            )
+        env["GH_TOKEN"] = user_tok
+        print("Using CONTROL_USER_REPO_TOKEN for personal-account repo create/push")
 
     if owner_type == "Organization":
         _run(
@@ -375,6 +398,11 @@ def run(argv: list[str] | None = None) -> int:
         default="",
         help="Optional PAT fallback copied as MODULES_GIT_TOKEN",
     )
+    parser.add_argument(
+        "--user-repo-token",
+        default="",
+        help="User PAT for POST /user/repos on personal accounts (CONTROL_USER_REPO_TOKEN)",
+    )
     parser.add_argument("--ruleset-json", required=True)
     parser.add_argument("--root", default=".")
     args = parser.parse_args(argv)
@@ -388,6 +416,7 @@ def run(argv: list[str] | None = None) -> int:
         app_client_id=args.app_client_id,
         app_private_key=args.app_private_key,
         modules_token=args.modules_token,
+        user_repo_token=args.user_repo_token,
         ruleset_json=Path(args.ruleset_json),
     )
     return 0
