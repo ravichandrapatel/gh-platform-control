@@ -7,8 +7,10 @@ Copy this tree to `OWNER/infra-dev`, then replace placeholders and wire OIDC.
 ## Layout
 
 ```text
-stacks/                      # IssueOps-generated OpenTofu roots
-.github/workflows/tofu.yml   # Calls pinned tofu-pipeline
+stacks/                      # Onboarded stacks (edit OK; new dirs via IssueOps only)
+scripts/check_new_stacks.py  # CI guard: refuse DIY new stacks/*
+root.hcl                     # Terragrunt remote state + provider (TG products)
+.github/workflows/tofu.yml   # guard-new-stacks + tofu-pipeline
 .github/workflows/drift.yml  # Drift report + stamp PR (create/update only)
 config/environment.yaml      # Role / region for this env
 ```

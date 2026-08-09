@@ -16,7 +16,11 @@ Register each row in [`config/environments.yaml`](../config/environments.yaml).
 - Store `MODULES_GIT_TOKEN` (contents:read on `gh-platform-modules`) and pass it as
   `secrets.modules_git_token` so private git modules download during `tofu init`.
 - Hold OIDC trust to **that** account’s deploy role.
-- Protect `main`; require PR reviews + status checks (prod: Environment reviewers).
+- Protect `main` with rulesets that **require** `guard-new-stacks` and **deny admin bypass**
+  ([WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md)). New envs: prefer EnvOps Issue Form (`envops` label).
+  New `stacks/*` only via IssueOps; day-2 edits OK.
+- Hold OIDC trust to **that** account’s deploy role.
+- Prod: Environment reviewers on apply.
 
 
 ## Customization later

@@ -21,4 +21,10 @@ __pycache__/
 *.py[cod]
 .pr-url
 .pr-branch
+.pr-mode
 .workload-repo
+.workload-url
+.env-registry-pr-url
+.env-registry-branch
+.duplicate-result.json
+.duplicate-conflicts.md

@@ -45,8 +45,8 @@ Local sanity:
 
 ```bash
 cd gh-platform-control
-ALLOW_PIN_PLACEHOLDERS=1 ./scripts/validate-pins.sh
-ALLOW_PLACEHOLDERS=1 ./scripts/validate-control.sh
+ALLOW_PIN_PLACEHOLDERS=1 PYTHONPATH=src python3 -m gh_platform_control validate-pins
+ALLOW_PLACEHOLDERS=1 PYTHONPATH=src python3 -m gh_platform_control validate-control
 ```
 
 ---
@@ -58,19 +58,19 @@ ALLOW_PLACEHOLDERS=1 ./scripts/validate-control.sh
 | Step | Rule |
 | --- | --- |
 | Open Issue Form | Anyone on a public control repo (form alone does **not** provision) |
-| Start automation | Issue must be labeled `issueops` + `product:<id>` |
+| Start automation | Issue must be labeled `issueops` (product from form) |
 | Author authz | Issue **author** must be in `config/operators.yaml` **or** have write/maintain/admin on control |
 
 See [PUBLIC_DEMO.md](PUBLIC_DEMO.md).
 
 ### 3.2 Steps
 
-1. **Issues → New issue → Provision S3 bucket** (or another product form).
+1. **Issues → New issue → Provision infrastructure** (pick **Product** in the form).
 2. Fill environment (`dev` / `prod`), inputs; submit.
 3. As an authorized operator, add labels:
    - `issueops`
-   - `product:s3-bucket` (match the product)
    - `status:pending-validation` (optional but useful)
+   - (`product:<id>` is synced from the form by the workflow)
 4. Watch Actions → `issue-provision`.
 5. On success:
    - Issue comment with workload PR URL
@@ -99,7 +99,20 @@ See [PUBLIC_DEMO.md](PUBLIC_DEMO.md).
 | Closed unmerged PR | Name free again |
 | Exists only in AWS, not in git | Not checked by control (Git is SoT) |
 
-### 3.4 Drift detection (day-2)
+### 3.4 Change settings on an existing resource (day-2)
+
+**Allowed:** onboarded users edit values under an **existing** `stacks/<stack_id>/` via a normal workload PR → `tofu-pipeline` → Environment apply.
+
+**Not allowed:** inventing a **new** `stacks/<id>/` folder — including by repo **owners/admins**. New stacks only via control IssueOps (`issueops/*` branch). CI `guard-new-stacks` + workload rulesets with **no admin bypass** ([WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md)).
+
+Do **not** open a new Issue Form for the same natural key once it is on `main` (duplicate check fails).
+
+### 3.5 New stacks (IssueOps only)
+
+1. Control Issue Form → App PR on `issueops/<stack_id>` → merge → apply.
+2. Users must not create stack directories outside that path.
+
+### 3.6 Drift detection (day-2)
 
 Workload cron (`drift.yml`) calls pinned **`drift-reconcile`** — control never plans or applies.
 
@@ -125,7 +138,8 @@ Docs: [drift-reconcile](https://github.com/ravichandrapatel/gh-platform-actions/
 | Label | Meaning |
 | --- | --- |
 | `issueops` | Eligible for provision workflow |
-| `product:s3-bucket` | Product router |
+| `product:s3-bucket` | Synced from form (OpenTofu) |
+| `product:s3-bucket-tg` | Synced from form (Terragrunt) |
 | `status:pending-validation` | Submitted / waiting |
 | `status:pr-open` | Workload PR opened |
 | `status:plan-ok` / `plan-failed` | From workload callback |
@@ -134,7 +148,7 @@ Docs: [drift-reconcile](https://github.com/ravichandrapatel/gh-platform-actions/
 | `status:config-error` | Pins / App credentials |
 | `status:provision-failed` | PR or Deployment create failed |
 
-Bootstrap: `./scripts/bootstrap-labels.sh OWNER/gh-platform-control`
+Bootstrap: `PYTHONPATH=src python3 -m gh_platform_control bootstrap-labels OWNER/gh-platform-control`
 
 ---
 
@@ -214,7 +228,7 @@ actions:
 ```
 
 ```bash
-./scripts/validate-pins.sh   # must pass (no floating refs)
+PYTHONPATH=src python3 -m gh_platform_control validate-pins   # must pass (no floating refs)
 ```
 
 ### 6.3 Update every workload caller
@@ -256,7 +270,7 @@ secrets:
 | Operators | `config/operators.yaml` | GitHub logins | Who may provision |
 | Env → repo/account | `config/environments.yaml` | registry rows | Where PRs go |
 
-Forbidden: `main`, `master`, `latest`, `HEAD` as pins ([`validate-pins.sh`](../scripts/validate-pins.sh)).
+Forbidden: `main`, `master`, `latest`, `HEAD` as pins (`validate-pins` CLI).
 
 ---
 
@@ -277,13 +291,12 @@ Details: [gh-platform-actions tofu-pipeline.md](https://github.com/ravichandrapa
 ## 9. Add a new product (rare day task)
 
 1. Module released in `gh-platform-modules` with tag.
-2. `config/catalog/products/<id>.yaml` — inputs, `module.path` / `module.ref`, `stack_id_from`, `uniqueness_key_from`.
+2. `config/catalog/products/<id>.yaml` — inputs, `module.path` / `module.ref`, `stack_id_from`, `uniqueness_key_from`, `runner`.
 3. `templates/<id>/*.tmpl` — codegen.
-4. `.github/ISSUE_TEMPLATE/<id>.yml` — **no** auto `issueops` labels.
-5. Extend `issue-provision.yml` `if:` (or generalize product detection).
-6. Extend `check_duplicate_resource.py` if uniqueness is not `bucket_name`.
-7. `./scripts/bootstrap-labels.sh` for `product:<id>`.
-8. Document in [ISSUEOPS.md](ISSUEOPS.md).
+4. `PYTHONPATH=src python3 -m gh_platform_control generate-issue-form` (refreshes Product/Environment/fields).
+5. Extend `check_duplicate_resource.py` if uniqueness is not `bucket_name`.
+6. `PYTHONPATH=src python3 -m gh_platform_control bootstrap-labels` for `product:<id>`.
+7. Document in [ISSUEOPS.md](ISSUEOPS.md).
 
 ---
 
@@ -291,12 +304,25 @@ Details: [gh-platform-actions tofu-pipeline.md](https://github.com/ravichandrapa
 
 MVP: **one env = one AWS account = one workload repo**.
 
+### Automated (preferred) — EnvOps Issue Form
+
+1. Ensure control has `MODULES_GIT_TOKEN` secret (copied onto new workloads) and App perms for EnvOps ([GITHUB_APP.md](GITHUB_APP.md)).
+2. **Issues → New → Onboard environment** — fill slug, profile (`non-prod`/`prod`), account, role ARN, region.
+3. Label the issue **`envops`** (authorized operator).
+4. Workflow `issue-env-onboard.yml` creates `OWNER/infra-<env>`, pushes starter code, GitHub Environment + variables, copies `MODULES_GIT_TOKEN`, applies `docs/ruleset-workload.json` (**no admin bypass**), and opens a control PR (`envops/<env>`) for `environments.yaml` + regenerated provision form.
+5. Merge the registry PR.
+6. Complete **AWS** OIDC trust + state backend ([OIDC_AND_BACKEND.md](OIDC_AND_BACKEND.md)) — not automated.
+7. Prod: add Environment reviewers on the workload repo if required.
+
+### Manual fallback
+
 1. Create `infra-<env>` from [`examples/infra-dev/`](../examples/infra-dev/) (or prod).
 2. Wire OIDC + backend ([OIDC_AND_BACKEND.md](OIDC_AND_BACKEND.md)).
 3. Install GitHub App on that repo ([GITHUB_APP.md](GITHUB_APP.md)).
 4. Add row to [`config/environments.yaml`](../config/environments.yaml).
-5. Add Environment option to Issue Forms.
+5. Regenerate Issue Form (`PYTHONPATH=src python3 -m gh_platform_control generate-issue-form`).
 6. Set `MODULES_GIT_TOKEN` on the workload repo.
+7. Apply workload ruleset ([WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md) / `docs/ruleset-workload.json`).
 
 ---
 
@@ -315,7 +341,7 @@ MVP: **one env = one AWS account = one workload repo**.
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| Form opened, nothing runs | No `issueops` / `product:*` labels | Add labels (authorized author) |
+| Form opened, nothing runs | No `issueops` label | Add `issueops` (authorized author) |
 | `authorization` failure | Author not in operators / no write | Add login to `operators.yaml` or grant write |
 | `status:config-error` | Missing App var/secret | Set `CONTROL_CLIENT_ID` / `CONTROL_APP_PRIVATE_KEY` on **control** |
 | PR create fails | App missing Pull requests: write | Update App permissions; re-accept install on workload |

@@ -19,7 +19,8 @@ Control IssueOps does **not** need AWS credentials.
 
 Prefer remote S3 backend with locking (`use_lockfile` or DynamoDB).
 
-- Generated stacks include `backend "s3" {}` and an example `backend.hcl`.
+- Generated stacks include `backend "s3" {}` and an example `backend.hcl` (tofu runner).
+- Terragrunt products use workload `root.hcl` `remote_state` generate instead of committed backend fragments.
 - Real backend config stays in secured store / Actions variables — never commit secrets.
 - Suggested key layout: `stacks/<stack_id>/terraform.tfstate` per account bucket.
 

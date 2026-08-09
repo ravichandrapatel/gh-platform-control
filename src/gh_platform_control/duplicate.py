@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
-# FILE_NAME: check_duplicate_resource.py
+# FILE_NAME: duplicate.py
 # DESCRIPTION: Fail+attach when natural key is claimed (control issues, open PRs, main).
-# VERSION: 0.2.0
+# VERSION: 0.4.0
 from __future__ import annotations
 
 import argparse
@@ -9,24 +8,22 @@ import base64
 import json
 import os
 import re
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
 
+from gh_platform_control.parse import parse_issue_body
+from gh_platform_control.util import fail
 
+# Matches tofu module args and terragrunt inputs (spaces around '=' allowed).
 BUCKET_RE = re.compile(r'bucket_name\s*=\s*"([^"]+)"')
 ISSUE_REF_RE = re.compile(r"https://github\.com/([^/]+/[^/]+)/issues/(\d+)")
 ISSUE_HASH_RE = re.compile(r"([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#(\d+)")
 
 CLAIM_LABELS = frozenset({"status:pending-validation", "status:pr-open"})
-
-
-def fail(msg: str) -> None:
-    print(f"ERROR: {msg}", file=sys.stderr)
-    raise SystemExit(1)
+MAX_GH_PAGES = 5
 
 
 def gh_api(
@@ -63,6 +60,20 @@ def gh_api(
         fail(f"GitHub API {method} {path} failed ({e.code}): {detail}")
 
 
+def gh_api_paginated(path: str, token: str, *, per_page: int = 100) -> list[Any]:
+    """Fetch up to MAX_GH_PAGES of a list endpoint (Link-header free, page= N)."""
+    items: list[Any] = []
+    sep = "&" if "?" in path else "?"
+    for page in range(1, MAX_GH_PAGES + 1):
+        data = gh_api(f"{path}{sep}per_page={per_page}&page={page}", token)
+        if not isinstance(data, list) or not data:
+            break
+        items.extend(data)
+        if len(data) < per_page:
+            break
+    return items
+
+
 def list_stack_dirs(repo: str, ref: str, token: str) -> list[str]:
     data = gh_api(f"/repos/{repo}/contents/stacks?ref={urllib.parse.quote(ref)}", token)
     if not isinstance(data, list):
@@ -70,41 +81,84 @@ def list_stack_dirs(repo: str, ref: str, token: str) -> list[str]:
     return [item["name"] for item in data if item.get("type") == "dir"]
 
 
-def read_main_tf(repo: str, stack_name: str, ref: str, token: str) -> str:
-    path = (
-        f"/repos/{repo}/contents/stacks/{urllib.parse.quote(stack_name)}/main.tf"
+def read_repo_file(repo: str, path: str, ref: str, token: str) -> str:
+    api = (
+        f"/repos/{repo}/contents/{urllib.parse.quote(path)}"
         f"?ref={urllib.parse.quote(ref)}"
     )
-    data = gh_api(path, token)
+    data = gh_api(api, token)
     if not isinstance(data, dict) or data.get("encoding") != "base64":
         return ""
     raw = data.get("content") or ""
     return base64.b64decode(raw.replace("\n", "")).decode("utf-8", errors="replace")
 
 
-def bucket_in_tf(tf: str) -> str | None:
-    m = BUCKET_RE.search(tf)
+def bucket_from_text(text: str) -> str | None:
+    if not text:
+        return None
+    m = BUCKET_RE.search(text)
     return m.group(1) if m else None
+
+
+def bucket_from_metadata(text: str) -> str | None:
+    if not text.strip():
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    direct = str(data.get("bucket_name") or "").strip()
+    if direct:
+        return direct
+    uniq = data.get("uniqueness_inputs") or {}
+    if isinstance(uniq, dict):
+        nested = str(uniq.get("bucket_name") or "").strip()
+        if nested:
+            return nested
+    return None
+
+
+def bucket_in_stack(repo: str, stack_name: str, ref: str, token: str) -> str | None:
+    """Resolve bucket_name from tofu main.tf, terragrunt.hcl, or stack-metadata.json."""
+    meta = read_repo_file(repo, f"stacks/{stack_name}/stack-metadata.json", ref, token)
+    hit = bucket_from_metadata(meta)
+    if hit:
+        return hit
+    for rel in ("main.tf", "terragrunt.hcl"):
+        body = read_repo_file(repo, f"stacks/{stack_name}/{rel}", ref, token)
+        hit = bucket_from_text(body)
+        if hit:
+            return hit
+    return None
+
+
+def stack_ownership_text(repo: str, stack_name: str, ref: str, token: str) -> str:
+    """Prefer main.tf / terragrunt.hcl headers for issue ownership markers."""
+    parts: list[str] = []
+    for rel in ("main.tf", "terragrunt.hcl", "README.md"):
+        parts.append(read_repo_file(repo, f"stacks/{stack_name}/{rel}", ref, token))
+    meta = read_repo_file(repo, f"stacks/{stack_name}/stack-metadata.json", ref, token)
+    if meta:
+        parts.append(meta)
+    return "\n".join(parts)
 
 
 def find_bucket_stacks(repo: str, ref: str, bucket: str, token: str) -> list[str]:
     hits: list[str] = []
     for name in list_stack_dirs(repo, ref, token):
-        tf = read_main_tf(repo, name, ref, token)
-        if bucket_in_tf(tf) == bucket:
+        if bucket_in_stack(repo, name, ref, token) == bucket:
             hits.append(f"stacks/{name}")
     return hits
 
 
 def open_prs(repo: str, token: str) -> list[dict[str, Any]]:
-    data = gh_api(f"/repos/{repo}/pulls?state=open&per_page=100", token)
-    return data if isinstance(data, list) else []
+    data = gh_api_paginated(f"/repos/{repo}/pulls?state=open", token)
+    return [item for item in data if isinstance(item, dict)]
 
 
 def parse_issue_fields(body: str) -> dict[str, str]:
-    # Local import path when run under PYTHONPATH=scripts
-    from parse_issue import parse_issue_body
-
     return parse_issue_body(body or "")
 
 
@@ -115,6 +169,16 @@ def owning_issue_from_text(text: str, control_repo: str) -> str | None:
     for m in ISSUE_HASH_RE.finditer(text or ""):
         if m.group(1).lower() == control_repo.lower():
             return m.group(2)
+    try:
+        data = json.loads(text)
+        if isinstance(data, dict):
+            issue = str(data.get("issue") or "")
+            if "#" in issue:
+                repo_part, _, num = issue.partition("#")
+                if repo_part.lower() == control_repo.lower() and num.isdigit():
+                    return num
+    except (json.JSONDecodeError, TypeError):
+        pass
     return None
 
 
@@ -135,16 +199,18 @@ def list_control_claims(
     self_issue: str,
     token: str,
 ) -> list[dict[str, str]]:
+    """Scan open IssueOps claims for the same bucket+env (any S3 product / runner)."""
+    del product  # bucket uniqueness is env-scoped across tofu + terragrunt products
     conflicts: list[dict[str, str]] = []
-    label = urllib.parse.quote(f"issueops,product:{product}")
-    data = gh_api(
-        f"/repos/{control_repo}/issues?state=open&labels={label}&per_page=100",
+    label = urllib.parse.quote("issueops")
+    data = gh_api_paginated(
+        f"/repos/{control_repo}/issues?state=open&labels={label}",
         token,
     )
-    if not isinstance(data, list):
-        return conflicts
 
     for issue in data:
+        if not isinstance(issue, dict):
+            continue
         if "pull_request" in issue:
             continue
         number = str(issue.get("number", ""))
@@ -200,29 +266,25 @@ def format_conflict_markdown(
     return "\n".join(lines) + "\n"
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--resolved-json", required=True)
-    parser.add_argument("--token", default=os.environ.get("GH_TOKEN", ""))
-    parser.add_argument(
-        "--control-token",
-        default=os.environ.get("CONTROL_TOKEN", "") or os.environ.get("GITHUB_TOKEN", ""),
-    )
-    parser.add_argument("--attach", action="store_true")
-    parser.add_argument("--out-dir", default=".")
-    args = parser.parse_args()
-
-    if not args.token:
-        fail("missing workload GitHub token (pass --token or GH_TOKEN)")
-    control_token = args.control_token or args.token
-
-    with open(args.resolved_json, encoding="utf-8") as f:
-        resolved = json.load(f)
-
+def check_duplicate(
+    *,
+    resolved: dict,
+    token: str,
+    control_token: str,
+    attach: bool,
+    out_dir: Path,
+) -> dict:
+    """INTENT: Detect natural-key conflicts across issues/PRs/main.
+    INPUT: Resolved stack request, tokens, attach flag, artifact dir.
+    OUTPUT: Result dict (raises SystemExit via fail on conflict).
+    ROLE: Duplicate gate.
+    SIDE_EFFECTS: Writes .duplicate-* artifacts; may post issue comments.
+    """
     product = resolved.get("product")
-    if product != "s3-bucket":
-        print(json.dumps({"skipped": True, "reason": f"no uniqueness rule for {product}"}))
-        return 0
+    if product not in ("s3-bucket", "s3-bucket-tg"):
+        result = {"skipped": True, "reason": f"no uniqueness rule for {product}"}
+        print(json.dumps(result))
+        return result
 
     bucket = str((resolved.get("inputs") or {}).get("bucket_name", "")).strip()
     if not bucket:
@@ -234,11 +296,9 @@ def main() -> int:
     environment = resolved["environment"]
     own_stack = resolved["stack_path"]
     natural_key = resolved.get("natural_key") or f"{product}:{environment}:{bucket}"
-    out_dir = Path(args.out_dir)
 
     conflicts: list[dict[str, str]] = []
 
-    # 1) In-flight control issues (claim labels).
     conflicts.extend(
         list_control_claims(
             control_repo,
@@ -250,30 +310,28 @@ def main() -> int:
         )
     )
 
-    # 2) Already on main — always a conflict (even if path == own_stack).
-    for path in find_bucket_stacks(repo, "main", bucket, args.token):
+    for path in find_bucket_stacks(repo, "main", bucket, token):
+        stack_name = path.split("/", 1)[1]
         conflicts.append(
             {
                 "where": "main",
                 "path": path,
                 "url": f"https://github.com/{repo}/tree/main/{path}",
                 "owner_issue": owning_issue_from_text(
-                    read_main_tf(repo, path.split("/", 1)[1], "main", args.token),
+                    stack_ownership_text(repo, stack_name, "main", token),
                     control_repo,
                 )
                 or "",
             }
         )
 
-    # 3) Open workload PRs — allow only when PR is owned by this issue.
-    for pr in open_prs(repo, args.token):
+    for pr in open_prs(repo, token):
         head = (pr.get("head") or {}).get("ref") or ""
         if not head:
             continue
         pr_url = pr.get("html_url") or f"https://github.com/{repo}/pull/{pr.get('number')}"
-        paths = find_bucket_stacks(repo, head, bucket, args.token)
+        paths = find_bucket_stacks(repo, head, bucket, token)
         if not paths:
-            # Natural-key branch may exist before files are readable; also match branch name.
             if head.rstrip("/") == f"issueops/{resolved['stack_id']}" or head.endswith(
                 f"/{resolved['stack_id']}"
             ):
@@ -283,18 +341,16 @@ def main() -> int:
 
         owner = owning_issue_from_text(pr.get("body") or "", control_repo)
         if not owner:
-            # Fall back to stack file header on the PR head.
             for path in paths:
                 name = path.split("/", 1)[-1]
                 owner = owning_issue_from_text(
-                    read_main_tf(repo, name, head, args.token),
+                    stack_ownership_text(repo, name, head, token),
                     control_repo,
                 )
                 if owner:
                     break
 
         if owner == self_issue:
-            # Same issue re-run → attach/reuse in open_workload_pr.
             continue
 
         for path in paths:
@@ -307,7 +363,6 @@ def main() -> int:
                 }
             )
 
-    # De-dupe by url+path
     seen: set[tuple[str, str]] = set()
     unique: list[dict[str, str]] = []
     for c in conflicts:
@@ -329,7 +384,7 @@ def main() -> int:
 
     if not conflicts:
         print(json.dumps(result))
-        return 0
+        return result
 
     self_url = f"https://github.com/{control_repo}/issues/{self_issue}"
     md = format_conflict_markdown(
@@ -340,9 +395,8 @@ def main() -> int:
     )
     (out_dir / ".duplicate-conflicts.md").write_text(md)
 
-    if args.attach:
+    if attach:
         post_comment(control_repo, self_issue, md, control_token)
-        # Attach on owning issues (fail + attach both sides).
         owners = {c.get("owner_issue") or "" for c in conflicts}
         owners.discard("")
         owners.discard(self_issue)
@@ -364,8 +418,39 @@ def main() -> int:
     for c in conflicts:
         lines.append(f"  - {c['where']}: {c.get('path', '')} ({c['url']})")
     fail("\n".join(lines))
-    return 1
+    return result
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def run(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Fail+attach when natural key is claimed (control issues, open PRs, main)."
+    )
+    parser.add_argument("--resolved-json", required=True)
+    parser.add_argument("--token", default=os.environ.get("GH_TOKEN", ""))
+    parser.add_argument(
+        "--control-token",
+        default=os.environ.get("CONTROL_TOKEN", "") or os.environ.get("GITHUB_TOKEN", ""),
+    )
+    parser.add_argument("--attach", action="store_true")
+    parser.add_argument("--out-dir", default=".")
+    args = parser.parse_args(argv)
+
+    if not args.token:
+        fail("missing workload GitHub token (pass --token or GH_TOKEN)")
+    control_token = args.control_token or args.token
+
+    with open(args.resolved_json, encoding="utf-8") as f:
+        resolved = json.load(f)
+
+    check_duplicate(
+        resolved=resolved,
+        token=args.token,
+        control_token=control_token,
+        attach=args.attach,
+        out_dir=Path(args.out_dir),
+    )
+    return 0
+
+
+def main() -> int:
+    return run()

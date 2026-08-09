@@ -1,0 +1,70 @@
+# GENERATED FILE — do not edit by hand.
+# Source of truth: config/catalog/products/*.yaml + config/environments.yaml
+# Regenerate: PYTHONPATH=src python3 -m gh_platform_control generate-issue-form
+# Check drift: PYTHONPATH=src python3 -m gh_platform_control generate-issue-form --check
+name: Provision infrastructure
+description: Request a catalog product (authorized operators only — public demo is gated).
+title: "[provision] "
+# Do NOT auto-apply issueops labels — maintainers add: issueops, status:pending-validation
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Public demo gate:** opening this form does **not** start provisioning.
+        An authorized operator must label the issue with `issueops` (and be listed in
+        `config/operators.yaml` or have write access on this repo).
+
+        **Product** and **Environment** options are generated from the control catalog
+        and `config/environments.yaml`. Flow: validate → codegen → GitOps PR.
+
+        Catalog products:
+        - `s3-bucket` (S3 Bucket, runner=tofu) — Provision an S3 bucket via golden-path module.
+        - `s3-bucket-tg` (S3 Bucket (Terragrunt), runner=terragrunt) — Provision an S3 bucket via Terragrunt thin wrapper around the golden-path module.
+  - type: dropdown
+    id: product
+    attributes:
+      label: Product
+      description: Catalog product id (see list above).
+      options:
+        - s3-bucket
+        - s3-bucket-tg
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      description: Maps to an AWS account + workload repository.
+      options:
+        - dev
+        - prod
+    validations:
+      required: true
+  - type: input
+    id: bucket_name
+    attributes:
+      label: Bucket name
+      description: Globally unique S3 bucket name (lowercase).
+      placeholder: my-app-assets-dev
+    validations:
+      required: true
+  - type: input
+    id: project
+    attributes:
+      label: Project
+      description: Tagging project name (PascalCase or alnum).
+      placeholder: MyApp
+    validations:
+      required: true
+  - type: dropdown
+    id: enable_versioning
+    attributes:
+      label: Enable versioning
+      description: Enable S3 bucket versioning.
+      options:
+        - "true"
+        - "false"
+      default: 0
+    validations:
+      required: true
