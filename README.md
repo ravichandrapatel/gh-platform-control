@@ -21,7 +21,7 @@ Does **not** vendor module/action source or apply infrastructure itself.
 ## Quick start (after remotes exist)
 
 1. Replace placeholders in `config/pins.yaml` and seed `config/environments.yaml` (or onboard envs via EnvOps).
-2. Install the control GitHub App ([docs/GITHUB_APP.md](docs/GITHUB_APP.md)); set `MODULES_GIT_TOKEN` on control.
+2. Install the control GitHub App ([docs/GITHUB_APP.md](docs/GITHUB_APP.md)); ensure it is installed on **modules** (or All repos).
 3. Onboard workloads: **Issues → Onboard environment** → label `envops` (or copy [`examples/infra-dev/`](examples/infra-dev/) manually).
 4. Wire OIDC on **workload** repos ([docs/OIDC_AND_BACKEND.md](docs/OIDC_AND_BACKEND.md)).
 5. Add yourself to [`config/operators.yaml`](config/operators.yaml).

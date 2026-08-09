@@ -13,7 +13,7 @@
 | --- | --- | --- | --- |
 | T00.1 | Repo pushed; PR or main HEAD includes `src/` and no flat `scripts/` | `gh api` / UI | Tree matches local |
 | T00.2 | `gh auth` as operator who can open issues / see Actions | `gh auth status` | Logged in |
-| T00.3 | Control secrets present for live IssueOps (optional for T1–T3) | UI Settings → Secrets | `CONTROL_*`, `MODULES_GIT_TOKEN` if running T5+ |
+| T00.3 | Control secrets present for live IssueOps (optional for T1–T3) | UI Settings → Secrets | `CONTROL_CLIENT_ID` + `CONTROL_APP_PRIVATE_KEY` (App installed on modules) |
 | T00.4 | Labels exist | `gh label list` | `issueops`, `envops`, status labels |
 
 ---
@@ -113,7 +113,7 @@
 
 ## T7 — EnvOps live — edge + happy
 
-**Requires:** App Admin/Environments/Secrets perms; `MODULES_GIT_TOKEN` on control.
+**Requires:** App Admin/Environments/Secrets perms; App installed on modules repo (or All repos).
 
 | ID | Case | How | Pass criteria |
 | --- | --- | --- | --- |
@@ -122,7 +122,7 @@
 | T7.3 | `envops` + repo already exists | Pre-create empty `infra-testenv` | Fail; issue comment |
 | T7.4 | Happy path unique slug (e.g. `ciqa`) | Label | Repo created; ruleset; secret; registry PR `envops/ciqa`; `status:env-ready` |
 | T7.5 | Bad ARN / account mismatch | Form | validation-failed before create |
-| T7.6 | Missing MODULES_GIT_TOKEN | (if removable) | status:config-error |
+| T7.6 | Missing CONTROL_APP_PRIVATE_KEY | (if removable) | status:config-error |
 | T7.7 | Registry PR regenerates provision.yml | PR files | environments.yaml + provision.yml |
 
 ---
@@ -153,6 +153,6 @@
 | Pass | Date | Notes |
 | --- | --- | --- |
 | 1 | 2026-08-09 | Local T1–T3/T8 green. CI PR#16/#20 green. Twin-run push race found → fixed concurrency + attach (#20). Restart: T6.1 skip, T6.3 PR#11 success (single success run), T6.4 dup fail+attach, T6.7 bad product validation-failed, T7.1 skip, T7.2 existing `dev` validation-failed, T7.6 missing `MODULES_GIT_TOKEN` → config-error (no repo). Browser UI T5 blocked (IDE browser not signed into GitHub); templates/workflows verified via API. |
-| | | **Blocked until secret set:** T7.4 EnvOps happy path needs control secret `MODULES_GIT_TOKEN`. |
+| | | **Unblocked for App mint:** T7.4 EnvOps happy path needs control App credentials (no `MODULES_GIT_TOKEN` required). |
 | | | **Skipped (no live ruleset proof):** T6.9 DIY new stack on infra-dev. |
 | | | **Skipped (needs alt user):** T6.2 unauthorized author. |

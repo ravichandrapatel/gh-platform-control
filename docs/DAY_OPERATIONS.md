@@ -36,7 +36,7 @@ Control **never** applies to AWS. Workloads own OIDC, state, and Environment app
 
 - [ ] You (or the demo presenter) are in [`config/operators.yaml`](../config/operators.yaml).
 - [ ] Control secrets present: `CONTROL_CLIENT_ID` (variable), `CONTROL_APP_PRIVATE_KEY` (secret). See [GITHUB_APP.md](GITHUB_APP.md).
-- [ ] Workload secret `MODULES_GIT_TOKEN` set (read access to module repo). See [tofu-pipeline module download](../../gh-platform-actions/docs/workflows/tofu-pipeline.md).
+- [ ] Workload App mint configured: `CONTROL_CLIENT_ID`, `MODULES_GIT_REPOSITORY` (vars) + `CONTROL_APP_PRIVATE_KEY` (secret). See [GITHUB_APP.md](GITHUB_APP.md) and [tofu-pipeline module download](../../gh-platform-actions/docs/workflows/tofu-pipeline.md).
 - [ ] Workload GitHub Environments `dev` / `prod` exist (protection on prod as needed).
 - [ ] Pins are immutable SHAs/tags — no `main` / `latest` in [`config/pins.yaml`](../config/pins.yaml).
 - [ ] Control Environments page shows only `issueops-*` tracking envs (not bare `dev` as a deploy target). See [ISSUEOPS.md](ISSUEOPS.md).
@@ -248,8 +248,11 @@ permissions:
   contents: read
   id-token: write
   actions: write          # plan artifact between jobs
+with:
+  control_app_client_id: ${{ vars.CONTROL_CLIENT_ID }}
+  modules_git_repository: ${{ vars.MODULES_GIT_REPOSITORY }}
 secrets:
-  modules_git_token: ${{ secrets.MODULES_GIT_TOKEN }}
+  control_app_private_key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}
 ```
 
 ### 6.4 Verify
@@ -306,10 +309,10 @@ MVP: **one env = one AWS account = one workload repo**.
 
 ### Automated (preferred) — EnvOps Issue Form
 
-1. Ensure control has `MODULES_GIT_TOKEN` secret (copied onto new workloads) and App perms for EnvOps ([GITHUB_APP.md](GITHUB_APP.md)).
+1. Ensure control has App credentials (`CONTROL_CLIENT_ID` / `CONTROL_APP_PRIVATE_KEY`) and App install covers modules + new workloads ([GITHUB_APP.md](GITHUB_APP.md)).
 2. **Issues → New → Onboard environment** — fill slug, profile (`non-prod`/`prod`), account, role ARN, region.
 3. Label the issue **`envops`** (authorized operator).
-4. Workflow `issue-env-onboard.yml` creates `OWNER/infra-<env>`, pushes starter code, GitHub Environment + variables, copies `MODULES_GIT_TOKEN`, applies `docs/ruleset-workload.json` (**no admin bypass**), and opens a control PR (`envops/<env>`) for `environments.yaml` + regenerated provision form.
+4. Workflow `issue-env-onboard.yml` creates `OWNER/infra-<env>`, pushes starter code, GitHub Environment + variables, copies App mint credentials, applies `docs/ruleset-workload.json` (**no admin bypass**), and opens a control PR (`envops/<env>`) for `environments.yaml` + regenerated provision form.
 5. Merge the registry PR.
 6. Complete **AWS** OIDC trust + state backend ([OIDC_AND_BACKEND.md](OIDC_AND_BACKEND.md)) — not automated.
 7. Prod: add Environment reviewers on the workload repo if required.
@@ -321,7 +324,7 @@ MVP: **one env = one AWS account = one workload repo**.
 3. Install GitHub App on that repo ([GITHUB_APP.md](GITHUB_APP.md)).
 4. Add row to [`config/environments.yaml`](../config/environments.yaml).
 5. Regenerate Issue Form (`PYTHONPATH=src python3 -m gh_platform_control generate-issue-form`).
-6. Set `MODULES_GIT_TOKEN` on the workload repo.
+6. Set workload vars/secret: `CONTROL_CLIENT_ID`, `MODULES_GIT_REPOSITORY`, `CONTROL_APP_PRIVATE_KEY`.
 7. Apply workload ruleset ([WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md) / `docs/ruleset-workload.json`).
 
 ---
@@ -333,7 +336,7 @@ MVP: **one env = one AWS account = one workload repo**.
 3. Presenter login is in `operators.yaml`.
 4. Narrate: open form → label → PR → plan → merge → apply.
 5. Optional: GitHub interaction limits during the talk ([PUBLIC_DEMO.md](PUBLIC_DEMO.md)).
-6. Do not paste App private keys or `MODULES_GIT_TOKEN` into slides/chat.
+6. Do not paste App private keys into slides/chat.
 
 ---
 
@@ -346,7 +349,7 @@ MVP: **one env = one AWS account = one workload repo**.
 | `status:config-error` | Missing App var/secret | Set `CONTROL_CLIENT_ID` / `CONTROL_APP_PRIVATE_KEY` on **control** |
 | PR create fails | App missing Pull requests: write | Update App permissions; re-accept install on workload |
 | Duplicate validation-failed | Natural key claimed | Close/merge existing claim or pick new name |
-| Module download fails in validate | Missing `MODULES_GIT_TOKEN` | Set secret; pass `modules_git_token` in caller |
+| Module download fails in validate | App not on modules / missing workload App secret | Install App on modules; set `CONTROL_*` + `MODULES_GIT_REPOSITORY` |
 | Plan waits on Environment | Old single-job pipeline pin | Bump to multi-stage SHA (`validate`/`plan` without env) |
 | Control shows “Ready to deploy to dev” | Bare `dev` Environment on control | Use `issueops-dev` tracking only; delete bare `dev` |
 | Existing stack still on old module | Catalog bump doesn’t rewrite git | PR bump `ref=` on workload stack |

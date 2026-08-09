@@ -23,10 +23,12 @@ jobs:
       issues: write
       id-token: write
     # Pin to the same SHA as tofu.yml / control config/pins.yaml after publishing drift-reconcile.
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/drift-reconcile.yml@abb8ce241fb130b69ba9512bc5c9f722eb3795a0
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/drift-reconcile.yml@870cca9e868a842f5b5cceac7146df271445b3f2
     with:
       aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
       aws_region: us-east-1
       open_reconcile_pr: false
+      control_app_client_id: ${{ vars.CONTROL_CLIENT_ID }}
+      modules_git_repository: ${{ vars.MODULES_GIT_REPOSITORY }}
     secrets:
-      modules_git_token: ${{ secrets.MODULES_GIT_TOKEN }}
+      control_app_private_key: ${{ secrets.CONTROL_APP_PRIVATE_KEY }}

@@ -12,8 +12,10 @@ body:
         `config/operators.yaml` or have write access on this repo).
 
         Automation (GitHub-only): create `infra-<env>`, copy starter code, apply
-        branch ruleset, create GitHub Environment + variables, copy `MODULES_GIT_TOKEN`,
-        open a control PR for `environments.yaml` + regenerated Issue Form.
+        branch ruleset, create GitHub Environment + variables, copy App mint
+        credentials (`CONTROL_CLIENT_ID`, `CONTROL_APP_PRIVATE_KEY`,
+        `MODULES_GIT_REPOSITORY`), open a control PR for `environments.yaml` +
+        regenerated Issue Form.
 
         **Not automated:** AWS IAM OIDC trust / deploy role / state bucket — complete
         those after the control PR merges (see issue comment checklist).

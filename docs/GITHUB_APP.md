@@ -1,6 +1,6 @@
 # Control GitHub App
 
-Cross-repository PRs and EnvOps onboarding require a GitHub App (not a user PAT).
+Cross-repository PRs, EnvOps onboarding, and **private module download** use a GitHub App (not a long-lived modules PAT).
 
 ## Create
 
@@ -20,31 +20,37 @@ Cross-repository PRs and EnvOps onboarding require a GitHub App (not a user PAT)
    - Repository **Variables**: Read & write
    - Organization **Administration** (orgs only): Read & write — needed to **create** repositories under the org
 
-4. Install on the **owner** (prefer **All repositories** so new `infra-*` repos are covered automatically). After changing permissions, click **Accept** on the installation.
+4. Install on the **owner** (prefer **All repositories** so new `infra-*` repos and **`gh-platform-modules`** are covered). After changing permissions, click **Accept** on the installation.
 5. Generate a private key. Copy the App **Client ID** (not the numeric App ID).
 
-## Secrets / variables (**gh-platform-control** only)
+## Secrets / variables
 
-These must be on the **control** repository (where IssueOps / EnvOps workflows run), not on workload repos.
+### Control (`gh-platform-control`)
 
 | Name | Type | Value |
 | --- | --- | --- |
 | `CONTROL_CLIENT_ID` | Repository **variable** | GitHub App **Client ID** (e.g. `Iv23…`) |
 | `CONTROL_APP_PRIVATE_KEY` | Repository **secret** | PEM private key |
-| `MODULES_GIT_TOKEN` | Repository **secret** | Token with `contents:read` on `gh-platform-modules` — **copied** to new `infra-*` repos by EnvOps |
+| `MODULES_GIT_TOKEN` | Repository **secret** (optional) | PAT fallback; EnvOps copies only if set |
 
 ```bash
 gh variable set CONTROL_CLIENT_ID -R OWNER/gh-platform-control --body 'Iv23…'
 gh secret set CONTROL_APP_PRIVATE_KEY -R OWNER/gh-platform-control < app-private-key.pem
-gh secret set MODULES_GIT_TOKEN -R OWNER/gh-platform-control --body 'ghp_…'
 ```
 
-Workflow uses `actions/create-github-app-token` **v3** with `client-id` (legacy `app-id` is deprecated).
+### Workloads (`infra-*`) — set by EnvOps
+
+| Name | Type | Purpose |
+| --- | --- | --- |
+| `CONTROL_CLIENT_ID` | Variable | Passed to `tofu-pipeline` / `drift-reconcile` as `control_app_client_id` |
+| `MODULES_GIT_REPOSITORY` | Variable | `owner/gh-platform-modules` from `config/pins.yaml` |
+| `CONTROL_APP_PRIVATE_KEY` | Secret | Mint short-lived installation token scoped to the modules repo |
+
+Workflows use `actions/create-github-app-token` **v3** with `client-id` (legacy `app-id` is deprecated).
 
 - **Stack provision:** mint scopes the token to the target workload from `config/environments.yaml`.
-- **Env onboard:** mint uses installation scope for the owner (create repo + control registry PR).
-
-Workloads do **not** need App credentials for intake.
+- **Env onboard:** mint uses installation scope for the owner (create repo + control registry PR); copies App client id / key / modules repo onto the new workload.
+- **Module download (workload CI):** mint scopes to `MODULES_GIT_REPOSITORY` only.
 
 ## Cost
 

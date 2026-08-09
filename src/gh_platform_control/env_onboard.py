@@ -1,6 +1,6 @@
 # FILE_NAME: env_onboard.py
 # DESCRIPTION: Create infra-<env> repo, push scaffold, env/vars/secret/ruleset.
-# VERSION: 0.2.0
+# VERSION: 0.3.0
 from __future__ import annotations
 
 import argparse
@@ -92,11 +92,13 @@ def onboard_environment(
     resolved: dict,
     scaffold_dir: Path,
     token: str,
-    modules_token: str,
+    app_client_id: str,
+    app_private_key: str,
     ruleset_json: Path,
+    modules_token: str = "",
 ) -> None:
     """INTENT: Create workload repo and configure env/vars/secret/ruleset.
-    INPUT: Control root, resolved env plan, scaffold tree, tokens, ruleset path.
+    INPUT: Control root, resolved env plan, scaffold tree, App creds, ruleset path.
     OUTPUT: None.
     ROLE: EnvOps onboard.
     SIDE_EFFECTS: Creates GitHub repo; pushes main; writes .workload-* artifacts.
@@ -108,6 +110,9 @@ def onboard_environment(
     region = str(resolved.get("aws_region", "")).strip()
     account_id = str(resolved.get("aws_account_id", "")).strip()
     control_repo = str(resolved.get("control_repo", "")).strip()
+    modules_repository = str(resolved.get("modules_repository", "")).strip()
+    client_id = app_client_id.strip()
+    private_key = app_private_key.strip()
 
     owner, _, repo_name = workload_repository.partition("/")
     if not owner or not repo_name:
@@ -257,10 +262,22 @@ def onboard_environment(
             capture=True,
         )
 
+        if not client_id:
+            fail("CONTROL_CLIENT_ID empty; cannot set workload App variable")
+        if not private_key:
+            fail("CONTROL_APP_PRIVATE_KEY empty; cannot copy App key to workload")
+        if not modules_repository or "/" not in modules_repository:
+            fail(
+                "modules_repository missing or invalid in resolved plan "
+                "(expected owner/name from pins.yaml)"
+            )
+
         for name, value in (
             ("CONTROL_REPOSITORY", control_repo),
             ("ENVIRONMENT_NAME", env_name),
             ("AWS_ACCOUNT_ID", account_id),
+            ("CONTROL_CLIENT_ID", client_id),
+            ("MODULES_GIT_REPOSITORY", modules_repository),
         ):
             _run(
                 [
@@ -279,13 +296,32 @@ def onboard_environment(
         set_env_var(workload_repository, gh_environment, "AWS_ROLE_ARN", role_arn, env)
         set_env_var(workload_repository, gh_environment, "AWS_REGION", region, env)
 
-        if not modules_token:
-            fail("MODULES_GIT_TOKEN empty; cannot copy secret to workload")
         _run(
-            ["gh", "secret", "set", "MODULES_GIT_TOKEN", "-R", workload_repository],
+            [
+                "gh",
+                "secret",
+                "set",
+                "CONTROL_APP_PRIVATE_KEY",
+                "-R",
+                workload_repository,
+            ],
             env=env,
-            input_text=modules_token,
+            input_text=private_key,
         )
+        # Optional PAT fallback for callers still using modules_git_token.
+        if modules_token.strip():
+            _run(
+                [
+                    "gh",
+                    "secret",
+                    "set",
+                    "MODULES_GIT_TOKEN",
+                    "-R",
+                    workload_repository,
+                ],
+                env=env,
+                input_text=modules_token,
+            )
 
         rulesets = _run(
             ["gh", "api", f"/repos/{workload_repository}/rulesets", "--jq", ".[].name"],
@@ -332,7 +368,13 @@ def run(argv: list[str] | None = None) -> int:
     parser.add_argument("--resolved-json", required=True)
     parser.add_argument("--scaffold-dir", required=True)
     parser.add_argument("--token", required=True)
-    parser.add_argument("--modules-token", required=True)
+    parser.add_argument("--app-client-id", required=True)
+    parser.add_argument("--app-private-key", required=True)
+    parser.add_argument(
+        "--modules-token",
+        default="",
+        help="Optional PAT fallback copied as MODULES_GIT_TOKEN",
+    )
     parser.add_argument("--ruleset-json", required=True)
     parser.add_argument("--root", default=".")
     args = parser.parse_args(argv)
@@ -343,6 +385,8 @@ def run(argv: list[str] | None = None) -> int:
         resolved=resolved,
         scaffold_dir=Path(args.scaffold_dir),
         token=args.token,
+        app_client_id=args.app_client_id,
+        app_private_key=args.app_private_key,
         modules_token=args.modules_token,
         ruleset_json=Path(args.ruleset_json),
     )
