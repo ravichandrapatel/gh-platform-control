@@ -17,8 +17,19 @@ override.tf.json
 .idea/
 .vscode/
 *.swp
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .pr-url
 .pr-branch
 .pr-mode

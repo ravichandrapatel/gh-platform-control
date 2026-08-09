@@ -60,4 +60,4 @@ GitHub Apps are free. No hosted runner of your own is required beyond GitHub Act
 ## Personal-account EnvOps limits
 
 - Set `CONTROL_USER_REPO_TOKEN` (user PAT with `repo`) — App installation tokens cannot `POST /user/repos`.
-- Repository **rulesets** on private personal repos require GitHub Pro; EnvOps warns and continues if blocked.
+- Repository **rulesets** and Environment **required reviewers** on private personal repos require GitHub Pro (or an org); EnvOps warns and continues if rulesets are blocked. See [WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md).

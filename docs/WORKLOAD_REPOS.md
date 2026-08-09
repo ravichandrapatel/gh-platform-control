@@ -22,7 +22,7 @@ Register each row in [`config/environments.yaml`](../config/environments.yaml).
   ([WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md)). New envs: prefer EnvOps Issue Form (`envops` label).
   New `stacks/*` only via IssueOps; day-2 edits OK.
 - Hold OIDC trust to **that** account’s deploy role.
-- Prod: Environment reviewers on apply.
+- Prod (and preferably every apply Environment): required reviewers when the billing plan allows (personal **free** private → WARN residual; Pro/org required). See [WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md).
 
 
 ## Customization later
