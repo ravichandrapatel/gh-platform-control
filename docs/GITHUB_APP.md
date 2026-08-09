@@ -32,6 +32,7 @@ Cross-repository PRs, EnvOps onboarding, and **private module download** use a G
 | `CONTROL_CLIENT_ID` | Repository **variable** | GitHub App **Client ID** (e.g. `Iv23…`) |
 | `CONTROL_APP_PRIVATE_KEY` | Repository **secret** | PEM private key |
 | `MODULES_GIT_TOKEN` | Repository **secret** (optional) | PAT fallback; EnvOps copies only if set |
+| `CONTROL_USER_REPO_TOKEN` | Repository **secret** (personal accounts) | User PAT for `POST /user/repos` — **required** when control owner is a user; App installation tokens cannot create personal repos. Org owners use the App alone. |
 
 ```bash
 gh variable set CONTROL_CLIENT_ID -R OWNER/gh-platform-control --body 'Iv23…'
