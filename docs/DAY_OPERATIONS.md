@@ -315,7 +315,7 @@ MVP: **one env = one AWS account = one workload repo**.
 4. Workflow `issue-env-onboard.yml` creates `OWNER/infra-<env>`, pushes starter code, GitHub Environment + variables, copies App mint credentials, applies `docs/ruleset-workload.json` (**no admin bypass**), and opens a control PR (`envops/<env>`) for `environments.yaml` + regenerated provision form.
 5. Merge the registry PR.
 6. Complete **AWS** OIDC trust + state backend ([OIDC_AND_BACKEND.md](OIDC_AND_BACKEND.md)) — not automated.
-7. Prod: add Environment reviewers on the workload repo if required.
+7. Prod: add Environment **required reviewers** on the workload repo when the plan allows (personal free private → WARN residual; needs Pro/org). See [WORKLOAD_RULESETS.md](WORKLOAD_RULESETS.md).
 
 ### Manual fallback
 

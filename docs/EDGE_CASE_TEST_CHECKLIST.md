@@ -188,8 +188,8 @@
 | T10.8 | Hacker | Unauthorized EnvOps author | Denied | [x] |
 | T10.9 | Hacker | Spoof `product:*` label vs body | Body wins | [x] |
 | T10.10 | Residual | Human login ending in `[bot]` | Impossible on GitHub | Residual OK |
-| T10.11 | Insider | Force-push workload `main` | Blocked by ruleset / branch protection | [F] (free private `infra-dev`: rulesets/branch protection API 403 — residual force-push) |
-| T10.12 | Insider | Admin bypass ruleset | Bypass list **empty** | [F] (control `protect-main` bypass_actors includes Admin RepositoryRole) |
+| T10.11 | Insider | Force-push workload `main` | Blocked by ruleset / branch protection | [N/A] (personal free WARN-only; see WORKLOAD_RULESETS.md) |
+| T10.12 | Insider | Admin bypass ruleset | Bypass list **empty** | [x] (control `bypass_actors` cleared 2026-08-10) |
 | T10.13 | Insider | PAT with org admin used as modules token | Prefer App mint; document risk | [x] (docs: App mint preferred; PAT optional) |
 | T10.14 | Supply chain | Replace actions SHA with attacker fork | CODEOWNERS + pin review | [x] (pins covered by CODEOWNERS; same Admin bypass residual) |
 | T10.15 | Confused deputy | Workload OIDC role trusts `repo:*` | Deny; narrow subject | [S] (no AWS creds; docs specify non-wildcard `sub`) |
@@ -244,7 +244,7 @@
 | T14.1 | PR runs validate+plan; **no** apply | Job graph | [x] |
 | T14.2 | Apply requires `confirm_apply=APPLY` + Environment | Gate | [x] |
 | T14.3 | Plan artifact cannot be swapped cross-PR | Artifact naming / retention | [x] (Artifacts scoped to workflow run; `retention-days: 5`) |
-| T14.4 | Checkov / Conftest failure blocks merge (required check) | Branch protection | [F] (cannot set required checks on free private `infra-dev`) |
+| T14.4 | Checkov / Conftest failure blocks merge (required check) | Branch protection | [N/A] (personal free WARN-only; required checks need Pro/org) |
 | T14.5 | `destroy` never on PR path | Workflow | [x] |
 | T14.6 | Dual runner auto-detect (`terragrunt.hcl` vs tofu) | Both products | [x] |
 
@@ -282,7 +282,7 @@
 | T17.2 | Natural-key race (two issues same key) | One winner; other fail+attach | [x] |
 | T17.3 | Idempotent re-run same issue | Attach existing PR | [x] |
 | T17.4 | Partial EnvOps failure leaves orphan repo | Detected on retry (exists) | [x] |
-| T17.5 | GitHub API secondary rate limit | Retry/backoff or clear error | [F] (no explicit 429/backoff in control/actions scripts) |
+| T17.5 | GitHub API secondary rate limit | Retry/backoff or clear error | [x] (`github_http` + drift client 429/secondary retry) |
 | T17.6 | Actions outage runbook | Linked from DAY_OPERATIONS | [x] (DAY_OPERATIONS §13.1) |
 
 ---
@@ -294,7 +294,7 @@
 | T18.1 | Private workloads; public control OK | Visibility matrix | [x] |
 | T18.2 | No PII in Issue Form fields / logs | Field review | [x] |
 | T18.3 | Data residency: state buckets in approved regions | Backend config | [S] (state backend not wired) |
-| T18.4 | Separation of duties: author ≠ sole merger on prod | Environment reviewers | [F] (`infra-dev` Environment `dev` has no reviewers) |
+| T18.4 | Separation of duties: author ≠ sole merger on prod | Environment reviewers | [N/A] (personal free: Environment required reviewers 422; WARN-only) |
 | T18.5 | Change ticket / ADR link optional field (enterprise fork) | Process doc | [N/A] (optional enterprise) |
 | T18.6 | Evidence pack export (checklist + CI URLs) for audit | This file + log | [x] |
 
@@ -308,7 +308,7 @@
 | T19.2 | Create GitHub App; install All repos | Docs `GITHUB_APP.md` | [x] |
 | T19.3 | Seed `operators.yaml` with platform breakers only | Least privilege | [x] |
 | T19.4 | First EnvOps creates `infra-<first>` | T7.4 | [x] |
-| T19.5 | Wire AWS OIDC + state for first env | Apply succeeds on smoke stack | [F]/S] (OIDC/state still `REPLACE_ACCOUNT_ID`; drift OIDC fail) |
+| T19.5 | Wire AWS OIDC + state for first env | Apply succeeds on smoke stack | [S] (no AWS account yet — keep REPLACE_*) |
 | T19.6 | Train app teams: Issue Form only for **new** stacks | Day-2 doc acknowledged | [N/A] (solo demo) |
 | T19.7 | Publish internal SLO (provision PR < N minutes) | Measured | [S] (SLO not published) |
 
@@ -336,6 +336,7 @@ Historical evidence for `ravichandrapatel/*` demo tenants. New adopters start wi
 | 3 | 2026-08-10 | Adversarial: closed human `issueops/*` DIY; empty-product hole; T6.2/5/6; F1–F3. |
 | 4 | 2026-08-10 | Expanded to reusable architect matrix (T11–T20); Tier mapping. |
 | 5 | 2026-08-10 | Executed pending matrix: local gates + live IssueOps/EnvOps/status-sync; residual `[F]` on free-private rulesets/required checks/SoD, Admin bypass, missing AWS OIDC, no 429 backoff. |
+| 6 | 2026-08-10 | Closed residual `[F]`s: empty control bypass; 429 backoff; personal-free WARN-only for workload rulesets/SoD reviewers; AWS deferred (REPLACE). |
 
 ### Notable evidence links
 
@@ -351,3 +352,5 @@ Historical evidence for `ravichandrapatel/*` demo tenants. New adopters start wi
 - T16.1 status-sync: [run 31331778645](https://github.com/ravichandrapatel/gh-platform-control/actions/runs/31331778645)
 - Drift blocked OIDC: [infra-dev run 31331677472](https://github.com/ravichandrapatel/infra-dev/actions/runs/31331677472)
 
+- T10.12: control ruleset `bypass_actors=[]` (`current_user_can_bypass=never`)
+- T17.5: `src/gh_platform_control/github_http.py` + actions `drift_reconcile` retry

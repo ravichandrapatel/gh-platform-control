@@ -1,6 +1,6 @@
 # FILE_NAME: duplicate.py
 # DESCRIPTION: Fail+attach when natural key is claimed (control issues, open PRs, main).
-# VERSION: 0.4.0
+# VERSION: 0.4.1
 from __future__ import annotations
 
 import argparse
@@ -8,12 +8,11 @@ import base64
 import json
 import os
 import re
-import urllib.error
 import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any
 
+from gh_platform_control.github_http import gh_request
 from gh_platform_control.parse import parse_issue_body
 from gh_platform_control.util import fail
 
@@ -33,31 +32,13 @@ def gh_api(
     method: str = "GET",
     data: dict[str, Any] | None = None,
 ) -> Any:
-    url = f"https://api.github.com{path}"
-    body = None if data is None else json.dumps(data).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
+    return gh_request(
+        path,
+        token,
         method=method,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "gh-platform-control-duplicate-check",
-            **({"Content-Type": "application/json"} if body is not None else {}),
-        },
+        data=data,
+        user_agent="gh-platform-control-duplicate-check",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            raw = resp.read().decode("utf-8")
-            if not raw:
-                return None
-            return json.loads(raw)
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")[:500]
-        if e.code == 404:
-            return None
-        fail(f"GitHub API {method} {path} failed ({e.code}): {detail}")
 
 
 def gh_api_paginated(path: str, token: str, *, per_page: int = 100) -> list[Any]:

@@ -1,16 +1,15 @@
 # FILE_NAME: authz.py
 # DESCRIPTION: Fail closed unless issue author is an allowed IssueOps operator.
-# VERSION: 0.2.0
+# VERSION: 0.2.1
 from __future__ import annotations
 
 import argparse
 import json
 import os
 import re
-import urllib.error
-import urllib.request
 from pathlib import Path
 
+from gh_platform_control.github_http import gh_request
 from gh_platform_control.util import fail
 from gh_platform_control.yamlutil import load_yaml_file
 
@@ -20,24 +19,14 @@ REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 
 
 def gh_api(path: str, token: str) -> dict:
-    req = urllib.request.Request(
-        f"https://api.github.com{path}",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "gh-platform-control-authorize",
-        },
+    data = gh_request(
+        path,
+        token,
+        timeout=30,
+        user_agent="gh-platform-control-authorize",
+        not_found=lambda: {},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", errors="replace")[:300]
-        if e.code == 404:
-            return {}
-        fail(f"GitHub API {path} failed ({e.code}): {detail}")
-    return {}
+    return data if isinstance(data, dict) else {}
 
 
 def authorize(
