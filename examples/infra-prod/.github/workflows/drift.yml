@@ -23,7 +23,7 @@ jobs:
       issues: write
       id-token: write
     # Pin to the same SHA as tofu.yml / control config/pins.yaml after publishing drift-reconcile.
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/drift-reconcile.yml@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/drift-reconcile.yml@952412b3bffed728a9e07cd42cca705eda0a621f
     with:
       aws_role_arn: arn:aws:iam::REPLACE_ACCOUNT_ID:role/gh-platform-prod
       aws_region: us-east-1
