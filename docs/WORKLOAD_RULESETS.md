@@ -27,7 +27,7 @@ gh api --method POST repos/OWNER/infra-ENV/rulesets \
 
 ## Why
 
-CI alone fails DIY new-stack PRs (`scripts/check_new_stacks.py`). Admins can still merge if they may bypass required checks. With **no bypass actors**, the only way to add `stacks/<new>/` is an IssueOps PR whose head branch is `issueops/<stack_id>` (check passes) then a normal merge.
+CI alone fails DIY new-stack PRs (`gh-platform-actions/actions/security/guard-new-stacks`). Admins can still merge if they may bypass required checks. With **no bypass actors**, the only way to add `stacks/<new>/` is an IssueOps PR whose head branch is `issueops/<stack_id>` (check passes) then a normal merge.
 
 Day-2 edits to **existing** stacks still work on any branch; `guard-new-stacks` allows them.
 

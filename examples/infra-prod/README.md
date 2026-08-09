@@ -8,9 +8,8 @@ Copy this tree to `OWNER/infra-prod`, then replace placeholders and wire OIDC.
 
 ```text
 stacks/                      # Onboarded stacks (edit OK; new dirs via IssueOps only)
-scripts/check_new_stacks.py  # CI guard: refuse DIY new stacks/*
 root.hcl                     # Terragrunt remote state + provider (TG products)
-.github/workflows/tofu.yml   # guard-new-stacks + tofu-pipeline
+.github/workflows/tofu.yml   # guard-new-stacks action + tofu-pipeline (actions SHA)
 .github/workflows/drift.yml  # Drift report only (no stamp PR)
 config/environment.yaml      # Role / region for this env
 ```

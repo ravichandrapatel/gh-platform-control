@@ -15,7 +15,7 @@ TEXT_SUFFIXES = {".yml", ".yaml", ".md", ".hcl", ".tf", ".json", ".py", ".sh"}
 
 
 def should_rewrite(path: Path) -> bool:
-    return path.suffix.lower() in TEXT_SUFFIXES or path.name == "check_new_stacks.py"
+    return path.suffix.lower() in TEXT_SUFFIXES
 
 
 def rewrite(
@@ -61,9 +61,15 @@ def rewrite(
     out = out.replace('aws_region   = "us-east-1"', f'aws_region   = "{region}"')
     out = out.replace('aws_account  = "REPLACE_ACCOUNT_ID"', f'aws_account  = "{account}"')
 
+    # Reusable workflows and composite actions share the actions.ref pin.
     out = re.sub(
         r"(uses:\s+)([^\s]+)/\.github/workflows/([^\s]+)@[0-9a-f]{40}",
         rf"\1{actions_repo}/.github/workflows/\3@{actions_ref}",
+        out,
+    )
+    out = re.sub(
+        r"(uses:\s+)([^\s]+)/actions/([^\s]+)@[0-9a-f]{40}",
+        rf"\1{actions_repo}/actions/\3@{actions_ref}",
         out,
     )
     return out

@@ -1,6 +1,6 @@
 # FILE_NAME: tofu.yml
 # DESCRIPTION: infra-prod workload CI — plan on PR, apply on main via tofu-pipeline.
-# VERSION: 0.2.0
+# VERSION: 0.3.0
 
 name: tofu
 
@@ -9,7 +9,6 @@ on:
     paths:
       - "stacks/**"
       - ".github/workflows/tofu.yml"
-      - "scripts/check_new_stacks.py"
   push:
     branches: [main]
     paths:
@@ -20,6 +19,7 @@ permissions:
   id-token: write
 
 jobs:
+  # Job id is a required status check on workload main (ruleset-workload.json).
   guard-new-stacks:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -27,17 +27,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: New stacks require IssueOps
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-          ACTOR: ${{ github.actor }}
-        run: |
-          set -euo pipefail
-          git fetch origin "${{ github.base_ref }}" --depth=1 || true
-          python3 scripts/check_new_stacks.py \
-            --base-ref "origin/${{ github.base_ref }}" \
-            --head-ref-name "${HEAD_REF}" \
-            --actor "${ACTOR}"
+      - uses: ravichandrapatel/gh-platform-actions/actions/security/guard-new-stacks@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
+        with:
+          base_ref: origin/${{ github.base_ref }}
+          head_ref_name: ${{ github.head_ref }}
+          actor: ${{ github.actor }}
 
   detect:
     runs-on: ubuntu-latest
@@ -73,7 +67,7 @@ jobs:
       contents: read
       id-token: write
       actions: write
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@5b98cefb71ee7ced9bbfa6323155331fce715c38
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: prod
@@ -96,7 +90,7 @@ jobs:
       contents: read
       id-token: write
       actions: write
-    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@5b98cefb71ee7ced9bbfa6323155331fce715c38
+    uses: ravichandrapatel/gh-platform-actions/.github/workflows/tofu-pipeline.yml@0ed7dfe8e8fbcfd1cac2d783abcb6944ca821118
     with:
       working_directory: ${{ matrix.working_directory }}
       environment: prod
