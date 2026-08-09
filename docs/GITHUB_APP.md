@@ -56,3 +56,8 @@ Workflows use `actions/create-github-app-token` **v3** with `client-id` (legacy 
 ## Cost
 
 GitHub Apps are free. No hosted runner of your own is required beyond GitHub Actions minutes.
+
+## Personal-account EnvOps limits
+
+- Set `CONTROL_USER_REPO_TOKEN` (user PAT with `repo`) — App installation tokens cannot `POST /user/repos`.
+- Repository **rulesets** on private personal repos require GitHub Pro; EnvOps warns and continues if blocked.
